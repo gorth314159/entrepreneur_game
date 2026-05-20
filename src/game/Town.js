@@ -118,6 +118,11 @@ export default class Town {
       propertiesByType[type] = properties.filter(p => p.type === type);
     });
 
+    const bankOwner = (() => {
+      const b = properties.find(p => p.type === 'Bank');
+      return b && b.owner ? b.owner : null;
+    })();
+
     for (let visit = 0; visit < totalVisits; visit++) {
       // Determine what type of need the customer has
       const rand = Math.random();
@@ -180,6 +185,15 @@ export default class Town {
           if (selectedProp.owner) {
             this.recordPlayerRevenue(selectedProp.owner.id, revenueEarned, 1);
           }
+
+          if (bankOwner && bankOwner !== selectedProp.owner) {
+            const fee = Math.round(revenueEarned * 0.04);
+            if (fee > 0) {
+              bankOwner.cash += fee;
+              bankOwner.logTransaction('Bank Transaction Fee', fee, `Processing fee from ${selectedProp.name}`);
+              this.recordPlayerRevenue(bankOwner.id, fee, 0);
+            }
+          }
         }
       }
     }
@@ -196,7 +210,7 @@ export default class Town {
     players.forEach(player => {
       if (player.debt > 0) {
         // Accrue daily interest. (bank interest rate / 30 represents daily interest)
-        const bankInterestRate = playerBank ? playerBank.interestRate : 0.12; // 12% default unowned rate
+        const bankInterestRate = playerBank ? playerBank.interestRate : 0.18; // 18% default unowned rate
         const dailyInterestRate = bankInterestRate / 30;
         
         const interestPaid = player.accrueInterest(dailyInterestRate);

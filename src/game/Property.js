@@ -118,25 +118,25 @@ export class Property {
 export class Bank extends Property {
   constructor(id, name, gridX, gridY, width, height) {
     super(id, name, 'Bank', gridX, gridY, width, height, 100000, 150);
-    this.interestRate = 0.10; // Annualized rate set by owner (e.g. 10%)
+    this.interestRate = 0.15; // Annualized rate set by owner (e.g. 15%)
     this.totalLoansIssued = 0;
     this.totalInterestCollected = 0;
   }
 
   /**
-   * Set interest rate. Bound between 5% and 30%.
+   * Set interest rate. Bound between 5% and 50%.
    */
   setInterestRate(rate) {
-    this.interestRate = Math.max(0.05, Math.min(0.30, rate));
+    this.interestRate = Math.max(0.05, Math.min(0.50, rate));
   }
 
   simulateDay(town) {
     super.simulateDay(town);
-    // As a business, Bank might generate passive town transaction fees
+    // As a business, Bank generates passive town transaction & processing fees
     if (this.owner) {
-      const passiveIncome = Math.round(town.population * 0.15 * this.upgradeLevel);
+      const passiveIncome = Math.round(town.population * 8 * this.upgradeLevel);
       this.owner.cash += passiveIncome;
-      this.owner.logTransaction('Bank Fee Income', passiveIncome, `Earned processing fees from town transactions`);
+      this.owner.logTransaction('Bank Fee Income', passiveIncome, `Daily town banking & processing fees`);
       town.recordPlayerRevenue(this.owner.id, passiveIncome, 0);
     }
   }
@@ -187,14 +187,24 @@ export class AdServices extends Property {
 
   simulateDay(town) {
     super.simulateDay(town);
-    // AdServices earns minor random passive contracts if owned
-    if (this.owner) {
-      const passiveContracts = Math.round(Math.random() * 200 * this.upgradeLevel);
-      if (passiveContracts > 0) {
-        this.owner.cash += passiveContracts;
-        this.owner.logTransaction('Ad Passive Income', passiveContracts, `Passive digital ad contract payouts`);
-        town.recordPlayerRevenue(this.owner.id, passiveContracts, 0);
-      }
+    if (!this.owner) return;
+
+    const baseline = Math.round(town.population * 1.5 * this.upgradeLevel);
+
+    const b2cTypes = ['GroceryStore', 'Restaurant', 'RetailStore', 'MechanicShop'];
+    const adActiveBusinesses = (town.currentProperties || [])
+      .filter(p => b2cTypes.includes(p.type) && p.adAwareness > 0.15);
+    const retainer = adActiveBusinesses.length * 80 * this.upgradeLevel;
+
+    const total = baseline + retainer;
+    if (total > 0) {
+      this.owner.cash += total;
+      this.owner.logTransaction(
+        'Ad Agency Income',
+        total,
+        `Baseline contracts ($${baseline}) + ${adActiveBusinesses.length} active retainer(s) ($${retainer})`
+      );
+      town.recordPlayerRevenue(this.owner.id, total, 0);
     }
   }
 }
