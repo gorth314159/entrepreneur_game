@@ -547,7 +547,7 @@ function renderInspectorPanel() {
     } else if (selectedProperty instanceof Bank) {
       label = 'Loan Interest (%):';
       val = Math.round(selectedProperty.interestRate * 100);
-      min = 5; max = 30;
+      min = 5; max = 50;
     }
 
     formRow.innerHTML = `
@@ -578,13 +578,16 @@ function renderInspectorPanel() {
       restockRow.style.flexDirection = 'column';
       restockRow.style.gap = '5px';
       
-      // Check if there are active farms
+      // Sort farms by wholesale price ascending; emergency imports always last
       const farms = properties.filter(p => p instanceof Farm);
-      let dropdownOptions = `<option value="market">Emergency Market Imports ($${selectedProperty.emergencyImportCost}/unit)</option>`;
-      farms.forEach(f => {
+      const sortedFarms = [...farms].sort((a, b) => a.wholesalePrice - b.wholesalePrice);
+
+      let dropdownOptions = '';
+      sortedFarms.forEach(f => {
         const farmOwnerText = f.owner ? (f.owner === player ? 'Your Farm' : f.owner.name) : 'Town Farm';
         dropdownOptions += `<option value="${f.id}">${f.name} (${farmOwnerText} - $${f.wholesalePrice}/unit)</option>`;
       });
+      dropdownOptions += `<option value="market">Emergency Market Imports ($${selectedProperty.emergencyImportCost}/unit)</option>`;
 
       restockRow.innerHTML = `
         <div class="inspector-input-group" style="margin-top: 5px;">
@@ -753,7 +756,7 @@ function setupHUDActionListeners() {
   btnBankBorrow.addEventListener('click', () => {
     const player = players[currentPlayerIndex];
     const bankProp = properties.find(p => p instanceof Bank);
-    const baseRate = bankProp ? bankProp.interestRate : 0.12;
+    const baseRate = bankProp ? bankProp.interestRate : 0.18;
 
     const adjustedRate = player.borrow(10000, baseRate);
     
@@ -789,7 +792,7 @@ function updateBankOverlayUI(player, bankProp) {
   bankUserCash.textContent = `$${player.cash.toLocaleString()}`;
   bankUserDebt.textContent = `$${player.debt.toLocaleString()}`;
   
-  const baseRate = bankProp ? bankProp.interestRate : 0.12;
+  const baseRate = bankProp ? bankProp.interestRate : 0.18;
   const discount = Math.min(0.5, (player.skills.social - 1) * 0.05);
   const userRate = baseRate * (1 - discount);
   
