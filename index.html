@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entrepreneur - Top-down Business Simulator</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div id="app">
+    
+    <!-- --- SETUP / SPLASH SCREEN --- -->
+    <div id="setup-screen">
+      <div class="setup-card glass glass-glow animate-fade-in">
+        <h1>ENTREPRENEUR</h1>
+        <p class="subtitle">Local Multiplayer Business Simulation Game</p>
+        
+        <div class="setup-group">
+          <label for="game-length">Game Duration (Days)</label>
+          <select id="game-length" class="setup-select">
+            <option value="15">15 Days (Quick Match)</option>
+            <option value="30" selected>30 Days (Standard Match)</option>
+            <option value="45">45 Days (Extended Match)</option>
+          </select>
+        </div>
+        
+        <div class="setup-group">
+          <label for="player-count">Number of Players</label>
+          <select id="player-count" class="setup-select">
+            <option value="2" selected>2 Players</option>
+            <option value="3">3 Players</option>
+            <option value="4">4 Players</option>
+          </select>
+        </div>
+        
+        <div class="setup-group">
+          <label>Configure Players</label>
+          <div id="players-setup-container">
+            <!-- Dynamically populated rows for player configuration -->
+          </div>
+        </div>
+        
+        <button id="btn-start-game" class="btn-primary">Start Business Match</button>
+      </div>
+    </div>
+
+    <!-- --- MAIN GAME SCREEN --- -->
+    <div id="game-screen">
+      
+      <!-- 1. Map Canvas Viewport -->
+      <div class="map-viewport">
+        <!-- Floating HUD over Canvas -->
+        <div class="canvas-hud">
+          <div class="hud-pill glass">
+            <span>Day:</span>
+            <span id="hud-day" class="value">1 / 30</span>
+          </div>
+          <div class="hud-pill glass">
+            <span>Population:</span>
+            <span id="hud-population" class="value">150</span>
+          </div>
+          <div class="hud-pill glass">
+            <span>Affluence:</span>
+            <span id="hud-affluence" class="value">Medium</span>
+          </div>
+        </div>
+        
+        <!-- Canvas -->
+        <canvas id="game-canvas" width="800" height="600"></canvas>
+      </div>
+      
+      <!-- 2. Sidebar HUD -->
+      <div class="sidebar">
+        <!-- Player Turn Banner -->
+        <div class="turn-banner glass" id="turn-banner">
+          <div class="label">Current Player</div>
+          <div class="player-name" id="current-player-name">Player Name</div>
+        </div>
+        
+        <!-- Financials Panel -->
+        <div class="financials">
+          <div class="stat-box cash">
+            <div class="title">Cash</div>
+            <div class="val" id="stat-cash">$50,000</div>
+          </div>
+          <div class="stat-box debt">
+            <div class="title">Debt</div>
+            <div class="val" id="stat-debt">$0</div>
+          </div>
+          <div class="stat-box networth">
+            <div class="title">Net Worth (Cash + Assets - Debt)</div>
+            <div class="val" id="stat-networth">$50,000</div>
+          </div>
+        </div>
+
+        <!-- Selected Property Inspector Panel (Dynamic Actions) -->
+        <div id="inspector-panel" class="glass">
+          <div class="inspector-header">
+            <div class="inspector-title">
+              <span id="insp-name" class="name">Grocery Store</span>
+              <span id="insp-type" class="type-badge">B2C</span>
+            </div>
+            <div class="inspector-owner" id="insp-owner">Town Owned</div>
+          </div>
+          
+          <div class="inspector-stats" id="insp-stats-container">
+            <!-- Dynamically populated property stats -->
+          </div>
+
+          <!-- Price Adjustments & Restocking Forms -->
+          <div id="insp-custom-actions" style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- Dynamically injected controls (slidres for price, wholesale rates, etc.) -->
+          </div>
+          
+          <div class="inspector-actions" id="insp-buttons-container">
+            <!-- Dynamically injected button actions (Buy, Upgrade, Restock, Ad Campaign) -->
+          </div>
+        </div>
+
+        <!-- Tabs Section: Details on Properties, Skills, ledger -->
+        <div class="tab-container">
+          <button class="tab-btn active" data-tab="tab-properties">Assets</button>
+          <button class="tab-btn" data-tab="tab-skills">Skills</button>
+          <button class="tab-btn" data-tab="tab-ledger">Ledger</button>
+        </div>
+        
+        <!-- Tab Contents -->
+        <!-- 1. Properties Owned -->
+        <div id="tab-properties" class="tab-content active">
+          <div class="properties-list" id="player-properties-list">
+            <!-- List of properties owned by current player -->
+          </div>
+        </div>
+        
+        <!-- 2. Skills and Upgrades -->
+        <div id="tab-skills" class="tab-content">
+          <div class="skills-list" id="player-skills-list">
+            <!-- List of player skills with progress bars and upgrade buttons -->
+          </div>
+        </div>
+        
+        <!-- 3. Transaction Ledger -->
+        <div id="tab-ledger" class="tab-content">
+          <div class="ledger-container" id="player-ledger-list">
+            <!-- Transations for today -->
+          </div>
+        </div>
+        
+        <!-- Action Panels: Bank Borrow / Repay Loans -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: auto; margin-bottom: 12px;">
+          <button id="btn-sidebar-loan" class="btn-action">Bank Services</button>
+          <button id="btn-sidebar-help" class="btn-action">Guide</button>
+        </div>
+
+        <!-- End Turn Button -->
+        <button id="btn-end-turn" class="btn-end-turn">End Turn</button>
+      </div>
+
+    </div>
+
+    <!-- --- BANK SERVICES OVERLAY (LOAN INTAKE / PAYMENT) --- -->
+    <div class="bank-overlay" id="bank-overlay">
+      <div class="bank-card glass glass-glow">
+        <h3>Bank of Entrepreneur</h3>
+        
+        <div class="bank-row">
+          <span class="lbl">Your Cash:</span>
+          <span class="val" id="bank-user-cash" style="color: var(--accent-green)">$50,000</span>
+        </div>
+        <div class="bank-row">
+          <span class="lbl">Outstanding Debt:</span>
+          <span class="val" id="bank-user-debt" style="color: var(--accent-pink)">$0</span>
+        </div>
+        <div class="bank-row">
+          <span class="lbl">Base Interest Rate:</span>
+          <span class="val" id="bank-interest-rate" style="color: var(--accent-cyan)">12.0%</span>
+        </div>
+        
+        <hr style="border-color: var(--border-light); margin: 15px 0;">
+
+        <div class="setup-group">
+          <label>Borrow Cash (+$10,000)</label>
+          <button id="btn-bank-borrow" class="btn-action buy" style="width: 100%;">Take Loan ($10K)</button>
+        </div>
+        
+        <div class="setup-group" style="margin-bottom: 15px;">
+          <label>Repay Cash (-$10,000)</label>
+          <button id="btn-bank-repay" class="btn-action" style="width: 100%; border-color: var(--accent-pink);">Repay Loan ($10K)</button>
+        </div>
+
+        <button id="btn-bank-close" class="btn-action" style="width: 100%; margin-top: 10px;">Close Services</button>
+      </div>
+    </div>
+
+    <!-- --- SIMULATION / LEDGER PHASE OVERLAY --- -->
+    <div id="simulation-overlay">
+      <div class="sim-container glass glass-glow">
+        <div class="sim-header">
+          <h2>Day Complete</h2>
+          <p id="sim-day-title" style="color: var(--text-muted)">Results of Day 1</p>
+        </div>
+
+        <div class="sim-stats">
+          <div class="sim-stat-card">
+            <div class="lbl">Town Population</div>
+            <div class="val" id="sim-population">152</div>
+          </div>
+          <div class="sim-stat-card">
+            <div class="lbl">Affluence Status</div>
+            <div class="val" id="sim-affluence" style="color: var(--accent-cyan)">Medium</div>
+          </div>
+          <div class="sim-stat-card">
+            <div class="lbl">Total Revenue</div>
+            <div class="val" id="sim-revenue" style="color: var(--accent-green)">$0</div>
+          </div>
+          <div class="sim-stat-card">
+            <div class="lbl">Customers Served</div>
+            <div class="val" id="sim-served">0</div>
+          </div>
+        </div>
+
+        <div class="setup-group" style="margin-top: 15px; margin-bottom: 5px;">
+          <label>Player Daily Performance</label>
+        </div>
+        <div id="sim-player-breakdown" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; width: 100%;">
+          <!-- Dynamically populated performance cards -->
+        </div>
+
+        <div class="setup-group" style="margin-bottom: 5px;">
+          <label>Town Ledger Events</label>
+        </div>
+        <div class="sim-logs" id="sim-logs-container">
+          <!-- Dynamically populated row items -->
+        </div>
+
+        <button id="btn-next-day" class="btn-primary">Proceed to Next Day</button>
+      </div>
+    </div>
+
+    <!-- --- ENDGAME LEDGER / SCREEN --- -->
+    <div id="endgame-screen">
+      <div class="endgame-card glass glass-glow animate-fade-in">
+        <h1>FINANCIAL LEDGER</h1>
+        <p class="endgame-subtitle">The timeframe has concluded. Leaderboard final values:</p>
+        
+        <div class="leaderboard" id="endgame-leaderboard">
+          <!-- Dynamically filled ranks -->
+        </div>
+
+        <button id="btn-restart-game" class="btn-primary" style="width: 250px;">Play Again</button>
+      </div>
+    </div>
+
+    <!-- --- RULES / GUIDE DIALOG --- -->
+    <div class="bank-overlay" id="help-overlay">
+      <div class="bank-card glass glass-glow" style="width: 450px; text-align: left;">
+        <h3>Entrepreneur's Guide</h3>
+        <div style="font-size: 0.85rem; line-height: 1.5; color: var(--text-muted); display: flex; flex-direction: column; gap: 10px; max-height: 350px; overflow-y: auto; padding-right: 5px;">
+          <p><strong style="color: var(--text-main)">Objective:</strong> Achieve the highest Net Worth (Cash + Asset Value - Debt) at the end of the day limit.</p>
+          
+          <p><strong style="color: var(--text-main)">1. Game Grid & Map:</strong> The town is a grid. Click on properties (like Grocery, Restaurant, Mechanic, Farm, Bank, AdServices) to inspect details, buy, or adjust settings. Roads are for paths, houses generate customers.</p>
+          
+          <p><strong style="color: var(--text-main)">2. B2C pricing:</strong> Owners set prices. If prices are high relative to town affluence, customers will avoid you. Upgrades and ad campaigns increase customer willingness to visit.</p>
+          
+          <p><strong style="color: var(--text-main)">3. Supply Chain:</strong> Groceries and Restaurants require raw goods. Buy them wholesale from a player-owned Farm. If you have no raw goods, you pay expensive emergency import costs ($18 for Grocery, $28 for Restaurant) for each customer!</p>
+          
+          <p><strong style="color: var(--text-main)">4. Ad Campaigns:</strong> Buy campaigns from AdServices to spike advertising awareness. If player-owned, the transaction fee goes to the AdServices owner.</p>
+          
+          <p><strong style="color: var(--text-main)">5. Bank Services:</strong> Take loans or repay debt. Loans accrue daily interest. If a player owns the bank, all loan interest goes to their cash balance!</p>
+          
+          <p><strong style="color: var(--text-main)">6. Skills Upgrade:</strong> Spend cash to level up 5 key skills (Technology, Social, Planning, Marketing, Management) to receive powerful operational discounts and bonuses.</p>
+        </div>
+        <button id="btn-help-close" class="btn-action" style="width: 100%; margin-top: 15px;">Got it</button>
+      </div>
+    </div>
+
+  </div>
+  
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
