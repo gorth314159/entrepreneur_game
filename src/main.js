@@ -76,7 +76,9 @@ const projectsListContainer = document.getElementById('projects-list-container')
 // Bank Modal Elements
 const bankUserCash = document.getElementById('bank-user-cash');
 const bankUserDebt = document.getElementById('bank-user-debt');
-const bankInterestRate = document.getElementById('bank-interest-rate');
+const bankBaseInterest = document.getElementById('bank-base-interest');
+const bankDailyRate = document.getElementById('bank-daily-rate');
+const bankDailyCharge = document.getElementById('bank-daily-charge');
 const btnBankBorrow = document.getElementById('btn-bank-borrow');
 const btnBankRepay = document.getElementById('btn-bank-repay');
 const bankPenaltyWarning = document.getElementById('bank-penalty-warning');
@@ -1010,7 +1012,11 @@ function updateBankOverlayUI(player, bankProp) {
   const discount = Math.min(0.5, (player.skills.social - 1) * 0.05);
   const userRate = baseRate * (1 - discount);
   
-  bankInterestRate.textContent = `${(userRate * 100).toFixed(1)}% (Base: ${(baseRate * 100).toFixed(0)}%)`;
+  bankBaseInterest.textContent = `${(baseRate * 100).toFixed(1)}%`;
+  bankDailyRate.textContent = `${((userRate / 30) * 100).toFixed(3)}%`;
+
+  const dailyChargeAmt = Math.round(player.debt * (userRate / 30));
+  bankDailyCharge.textContent = `-$${dailyChargeAmt.toLocaleString()}`;
 
   // Update endgame penalty warning dynamically
   if (bankPenaltyWarning && projectedDebtPenalty) {

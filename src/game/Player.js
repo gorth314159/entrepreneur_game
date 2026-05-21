@@ -136,7 +136,19 @@ export default class Player {
   getSkillUpgradeCost(skillName) {
     const currentLevel = this.skills[skillName];
     // Base cost is 200, multiplying by 1.5 each level
-    return 200 * Math.pow(1.5, currentLevel - 1);
+    let cost = 200 * Math.pow(1.5, currentLevel - 1);
+
+    if (skillName === 'planning') {
+      cost *= 2.0;
+    } else if (skillName === 'technology') {
+      cost *= 0.80;
+    } else if (skillName === 'social') {
+      cost *= 0.80;
+    } else if (skillName === 'management') {
+      cost *= 0.60;
+    }
+
+    return cost;
   }
 
   // --- Skill Modifiers ---
