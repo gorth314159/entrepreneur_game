@@ -230,24 +230,39 @@ export class Farm extends Property {
   /**
    * Sells goods to B2C businesses.
    */
-  sellGoods(purchaser, quantity) {
+  sellGoods(purchaser, quantity, destinationProperty = null) {
     const qty = Math.min(quantity, this.inventory);
     if (qty <= 0) return 0;
 
     const cost = qty * this.wholesalePrice;
-    if (purchaser.cash < cost) return 0;
+    const isInternalTransfer = this.owner !== null && this.owner === purchaser;
 
-    purchaser.cash -= cost;
-    purchaser.logTransaction('Wholesale Purchase', -cost, `Bought ${qty} raw goods from ${this.name}`);
-    
+    if (!isInternalTransfer && purchaser.cash < cost) return 0;
+
     this.inventory -= qty;
 
-    if (this.owner) {
-      this.owner.cash += cost;
-      this.owner.logTransaction('Wholesale Revenue', cost, `Sold ${qty} raw goods to ${purchaser.name}`);
+    if (isInternalTransfer) {
+      const destName = destinationProperty ? destinationProperty.name : 'your store';
+      purchaser.logTransaction('Internal Transfer', 0, `Transferred ${qty} raw goods from ${this.name} to ${destName}`);
+    } else {
+      purchaser.cash -= cost;
+      purchaser.logTransaction('Wholesale Purchase', -cost, `Bought ${qty} raw goods from ${this.name}`);
+      
+      if (this.owner) {
+        this.owner.cash += cost;
+        this.owner.logTransaction('Wholesale Revenue', cost, `Sold ${qty} raw goods to ${purchaser.name}`);
+      }
     }
 
     return qty;
+  }
+
+  /**
+   * Calculates current production cost per unit.
+   */
+  getProductionCostPerUnit() {
+    const costReduction = this.owner ? this.owner.getManagementModifier() : 0;
+    return Math.round(this.productionCostPerUnit * (1 - costReduction));
   }
 
   /**
@@ -263,6 +278,7 @@ export class Farm extends Property {
       this.owner.logTransaction('Wholesale Revenue', this.wholesalePrice, `Sold 1 raw good to Town Business`);
       if (town) {
         town.recordPlayerRevenue(this.owner.id, this.wholesalePrice, 0);
+        town.recordPlayerCogs(this.owner.id, this.getProductionCostPerUnit());
       }
     }
     return true;
@@ -274,7 +290,7 @@ export class Farm extends Property {
     // Produce raw goods
     // Management skill of the owner reduces production cost per unit
     const costReduction = this.owner ? this.owner.getManagementModifier() : 0;
-    const currentCost = Math.round(this.productionCostPerUnit * (1 - costReduction));
+    const currentCost = this.getProductionCostPerUnit(); // Math.round(this.productionCostPerUnit * (1 - costReduction));
 
     const dailyProduction = 40 + (this.upgradeLevel - 1) * 20;
     const productionCostTotal = dailyProduction * currentCost;
@@ -305,6 +321,7 @@ export class Farm extends Property {
         this.owner.cash += profit;
         this.owner.logTransaction('Farm Clearance Sale', profit, `Cleared ${excess} excess inventory wholesale`);
         town.recordPlayerRevenue(this.owner.id, profit, 0);
+        town.recordPlayerCogs(this.owner.id, excess * currentCost);
       }
     } else {
       // Unowned farms produce automatically and keep inventory static for purchases
@@ -368,6 +385,18 @@ export class B2CProperty extends Property {
     this.rawGoodsInventory = 0;
     this.customersServedToday = 0;
     this.revenueToday = 0;
+    this.cogsToday = 0;
+    this.averageUnitCost = 15; // default unit cost basis
+  }
+
+  /**
+   * Helper to add items to raw goods inventory while updating weighted average cost basis.
+   */
+  addToInventory(qty, unitCost) {
+    if (qty <= 0) return;
+    const totalCost = (this.rawGoodsInventory * this.averageUnitCost) + (qty * unitCost);
+    this.rawGoodsInventory += qty;
+    this.averageUnitCost = this.rawGoodsInventory > 0 ? totalCost / this.rawGoodsInventory : unitCost;
   }
 
   setPrice(newPrice) {
@@ -391,8 +420,8 @@ export class B2CProperty extends Property {
   restockFromFarm(farm, quantity) {
     if (!this.requiresGoods || !this.owner) return 0;
     
-    const qtyBought = farm.sellGoods(this.owner, quantity);
-    this.rawGoodsInventory += qtyBought;
+    const qtyBought = farm.sellGoods(this.owner, quantity, this);
+    this.addToInventory(qtyBought, farm.wholesalePrice);
     return qtyBought;
   }
 
@@ -406,17 +435,20 @@ export class B2CProperty extends Property {
     }
 
     let isEmergencyStocked = false;
+    let unitCogs = 0;
     
     // Consume raw goods if required
     if (this.requiresGoods) {
       if (this.rawGoodsInventory > 0) {
         this.rawGoodsInventory--;
+        unitCogs = this.averageUnitCost;
       } else {
         // Auto-purchase emergency imports if owner has cash
         if (this.owner && this.owner.cash >= this.emergencyImportCost) {
           this.owner.cash -= this.emergencyImportCost;
           this.owner.logTransaction('Emergency Import', -this.emergencyImportCost, `Imported raw goods for customer at ${this.name}`);
           isEmergencyStocked = true;
+          unitCogs = this.emergencyImportCost;
         } else if (!this.owner) {
           // Try to source from a Farm in town first
           const farm = town ? town.findBestFarmForTownPurchase() : null;
@@ -424,6 +456,7 @@ export class B2CProperty extends Property {
             farm.sellUnitToTown(town);
           }
           isEmergencyStocked = true;
+          unitCogs = farm ? farm.wholesalePrice : this.emergencyImportCost;
         } else {
           // Out of stock, cannot serve customer
           return 0;
@@ -435,12 +468,17 @@ export class B2CProperty extends Property {
     this.customersServedToday++;
     const revenue = pricePaid;
     this.revenueToday += revenue;
+    this.cogsToday += unitCogs;
 
     if (this.owner) {
       this.owner.cash += revenue;
       // Adjust customer satisfaction based on social skills of owner
       const socialBonus = this.owner.getSocialSatisfactionModifier();
       this.customerSatisfaction = Math.min(1.0, Math.max(0.3, 0.75 + socialBonus + satisfactModifier));
+      
+      if (town) {
+        town.recordPlayerCogs(this.owner.id, unitCogs);
+      }
     }
 
     return revenue;
@@ -471,6 +509,7 @@ export class B2CProperty extends Property {
     // Reset daily counters for tomorrow
     this.customersServedToday = 0;
     this.revenueToday = 0;
+    this.cogsToday = 0;
     super.simulateDay(town);
   }
 }
