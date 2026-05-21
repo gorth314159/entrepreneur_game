@@ -510,7 +510,7 @@ function renderInspectorPanel() {
   addStatRow('Maintenance / Day:', `$${selectedProperty.getMaintenanceCost().toLocaleString()}`);
 
   if (selectedProperty instanceof B2CProperty) {
-    addStatRow('Capacity limit:', `${selectedProperty.customersServedToday} / ${selectedProperty.getCapacity()}`);
+    addStatRow('Capacity limit:', `${selectedProperty.customersServedLastSimulation} / ${selectedProperty.getCapacity()}`);
     addStatRow('Ad Awareness:', `${(selectedProperty.adAwareness * 100).toFixed(0)}%`);
     addStatRow('Satisfaction:', `${(selectedProperty.customerSatisfaction * 100).toFixed(0)}%`);
     if (selectedProperty.requiresGoods) {
@@ -519,6 +519,7 @@ function renderInspectorPanel() {
   } else if (selectedProperty instanceof Farm) {
     addStatRow('Wholesale Production:', `${40 + (selectedProperty.upgradeLevel - 1) * 20} units/day`);
     addStatRow('Available Stock:', `${selectedProperty.inventory} units`);
+    addStatRow('Sold Last Simulation:', `${selectedProperty.unitsSoldLastSimulation} units`);
   } else if (selectedProperty instanceof Apartments) {
     addStatRow('Max Capacity:', `${selectedProperty.tenants} / ${selectedProperty.getMaxTenants()} tenants`);
   } else if (selectedProperty instanceof Bank) {
@@ -596,6 +597,15 @@ function renderInspectorPanel() {
       });
       dropdownOptions += `<option value="market">Emergency Market Imports ($${selectedProperty.emergencyImportCost}/unit)</option>`;
 
+      let autoDropdownOptions = '';
+      sortedFarms.forEach(f => {
+        const farmOwnerText = f.owner ? (f.owner === player ? 'Your Farm' : f.owner.name) : 'Town Farm';
+        const isSelected = selectedProperty.autoPurchaseSource === f.id ? 'selected' : '';
+        autoDropdownOptions += `<option value="${f.id}" ${isSelected}>${f.name} (${farmOwnerText} - $${f.wholesalePrice}/unit)</option>`;
+      });
+      const isMarketSelected = selectedProperty.autoPurchaseSource === 'market' ? 'selected' : '';
+      autoDropdownOptions += `<option value="market" ${isMarketSelected}>Emergency Market Imports ($${selectedProperty.emergencyImportCost}/unit)</option>`;
+
       restockRow.innerHTML = `
         <div class="inspector-input-group" style="margin-top: 5px;">
           <label>Restock Source:</label>
@@ -607,11 +617,50 @@ function renderInspectorPanel() {
           <button id="btn-restock-20" class="btn-action">Buy 20 Units</button>
           <button id="btn-restock-50" class="btn-action">Buy 50 Units</button>
         </div>
+        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <label style="font-size: 0.8rem; font-weight: 600;">Auto-Purchase Each Turn</label>
+            <input type="checkbox" id="chk-auto-purchase" ${selectedProperty.autoPurchaseEnabled ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px;">
+          </div>
+          <div id="auto-purchase-controls" style="display: ${selectedProperty.autoPurchaseEnabled ? 'flex' : 'none'}; flex-direction: column; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+              <label style="font-size: 0.75rem; color: var(--text-muted);">Auto Source:</label>
+              <select id="auto-purchase-source-select" class="setup-select" style="width: 150px; padding: 4px 8px; font-size: 0.8rem;">
+                ${autoDropdownOptions}
+              </select>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+              <label style="font-size: 0.75rem; color: var(--text-muted);">Auto Amount:</label>
+              <input type="number" id="auto-purchase-amount-input" class="setup-input" style="width: 70px; padding: 4px 8px; font-size: 0.8rem; text-align: center; border-radius: 4px;" min="5" max="200" step="5" value="${selectedProperty.autoPurchaseAmount}">
+            </div>
+          </div>
+        </div>
       `;
 
       const sourceSelect = restockRow.querySelector('#restock-source-select');
       const buy20Btn = restockRow.querySelector('#btn-restock-20');
       const buy50Btn = restockRow.querySelector('#btn-restock-50');
+
+      const chkAuto = restockRow.querySelector('#chk-auto-purchase');
+      const autoControls = restockRow.querySelector('#auto-purchase-controls');
+      const autoSourceSelect = restockRow.querySelector('#auto-purchase-source-select');
+      const autoAmountInput = restockRow.querySelector('#auto-purchase-amount-input');
+
+      chkAuto.addEventListener('change', () => {
+        selectedProperty.autoPurchaseEnabled = chkAuto.checked;
+        autoControls.style.display = chkAuto.checked ? 'flex' : 'none';
+      });
+
+      autoSourceSelect.addEventListener('change', () => {
+        selectedProperty.autoPurchaseSource = autoSourceSelect.value;
+      });
+
+      autoAmountInput.addEventListener('change', () => {
+        let val = parseInt(autoAmountInput.value, 10);
+        if (isNaN(val) || val < 1) val = 5;
+        autoAmountInput.value = val;
+        selectedProperty.autoPurchaseAmount = val;
+      });
 
       const triggerRestock = (qty) => {
         const sourceVal = sourceSelect.value;

@@ -218,6 +218,8 @@ export class Farm extends Property {
     this.wholesalePrice = 15; // wholesale price per unit of raw goods
     this.inventory = 40; // Start with 40 units of stock available
     this.productionCostPerUnit = 8;
+    this.unitsSoldToday = 0;
+    this.unitsSoldLastSimulation = 0;
   }
 
   /**
@@ -240,6 +242,7 @@ export class Farm extends Property {
     if (!isInternalTransfer && purchaser.cash < cost) return 0;
 
     this.inventory -= qty;
+    this.unitsSoldToday += qty;
 
     if (isInternalTransfer) {
       const destName = destinationProperty ? destinationProperty.name : 'your store';
@@ -272,6 +275,7 @@ export class Farm extends Property {
     const reserve = this.owner ? 20 : 0;
     if (this.inventory <= reserve) return false;
     this.inventory--;
+    this.unitsSoldToday++;
     
     if (this.owner) {
       this.owner.cash += this.wholesalePrice;
@@ -318,6 +322,7 @@ export class Farm extends Property {
         const autoSellPrice = 10; // low emergency clearance price
         const profit = excess * autoSellPrice;
         this.inventory = 120;
+        this.unitsSoldToday += excess;
         this.owner.cash += profit;
         this.owner.logTransaction('Farm Clearance Sale', profit, `Cleared ${excess} excess inventory wholesale`);
         town.recordPlayerRevenue(this.owner.id, profit, 0);
@@ -327,6 +332,10 @@ export class Farm extends Property {
       // Unowned farms produce automatically and keep inventory static for purchases
       this.inventory = Math.min(100, this.inventory + dailyProduction);
     }
+
+    // Save last day's metrics before resetting
+    this.unitsSoldLastSimulation = this.unitsSoldToday;
+    this.unitsSoldToday = 0;
   }
 }
 
@@ -387,6 +396,10 @@ export class B2CProperty extends Property {
     this.revenueToday = 0;
     this.cogsToday = 0;
     this.averageUnitCost = 15; // default unit cost basis
+    this.autoPurchaseEnabled = false;
+    this.autoPurchaseAmount = 20;
+    this.autoPurchaseSource = 'market';
+    this.customersServedLastSimulation = 0;
   }
 
   /**
@@ -423,6 +436,79 @@ export class B2CProperty extends Property {
     const qtyBought = farm.sellGoods(this.owner, quantity, this);
     this.addToInventory(qtyBought, farm.wholesalePrice);
     return qtyBought;
+  }
+
+  /**
+   * Performs auto-purchase of raw goods from a Farm or emergency market.
+   */
+  performAutoPurchase(properties, town) {
+    if (!this.requiresGoods || !this.owner || !this.autoPurchaseEnabled) return;
+
+    const qty = this.autoPurchaseAmount;
+    if (qty <= 0) return;
+
+    if (this.autoPurchaseSource === 'market') {
+      const totalCost = qty * this.emergencyImportCost;
+      if (this.owner.cash >= totalCost) {
+        this.owner.cash -= totalCost;
+        this.addToInventory(qty, this.emergencyImportCost);
+        this.owner.logTransaction(
+          'Auto-Purchase (Emergency)',
+          -totalCost,
+          `Auto-imported ${qty} goods for ${this.name}`
+        );
+        if (town && town.currentDailyLog) {
+          town.currentDailyLog.events.push(
+            `${this.owner.name} auto-purchased ${qty} emergency units for ${this.name} (-$${totalCost.toLocaleString()}).`
+          );
+        }
+      } else {
+        if (town && town.currentDailyLog) {
+          town.currentDailyLog.events.push(
+            `Auto-Purchase failed: Insufficient cash to emergency import for ${this.name}.`
+          );
+        }
+      }
+    } else {
+      const farm = properties.find(p => p.id === this.autoPurchaseSource);
+      if (farm) {
+        const avail = Math.min(qty, farm.inventory);
+        if (avail <= 0) {
+          if (town && town.currentDailyLog) {
+            town.currentDailyLog.events.push(
+              `Auto-Purchase failed: ${farm.name} is out of stock for ${this.name}.`
+            );
+          }
+          return;
+        }
+
+        const totalCost = avail * farm.wholesalePrice;
+        const isOwnFarm = farm.owner === this.owner;
+
+        if (isOwnFarm || this.owner.cash >= totalCost) {
+          const bought = this.restockFromFarm(farm, avail);
+          if (bought > 0 && town && town.currentDailyLog) {
+            const transferType = isOwnFarm ? 'internal transfer' : 'purchase';
+            const costText = isOwnFarm ? 'free transfer' : `-$${totalCost.toLocaleString()}`;
+            town.currentDailyLog.events.push(
+              `${this.owner.name} auto-purchased ${bought} units from ${farm.name} for ${this.name} (${transferType}, ${costText}).`
+            );
+          }
+        } else {
+          if (town && town.currentDailyLog) {
+            town.currentDailyLog.events.push(
+              `Auto-Purchase failed: Insufficient cash to buy from ${farm.name} for ${this.name} (requires $${totalCost.toLocaleString()}).`
+            );
+          }
+        }
+      } else {
+        if (town && town.currentDailyLog) {
+          town.currentDailyLog.events.push(
+            `Auto-Purchase failed: Configured farm not found for ${this.name}.`
+          );
+        }
+      }
+    }
   }
 
   /**
@@ -505,6 +591,9 @@ export class B2CProperty extends Property {
         this.customerSatisfaction = Math.max(0.2, this.customerSatisfaction - 0.2);
       }
     }
+
+    // Save last day's metrics before resetting
+    this.customersServedLastSimulation = this.customersServedToday;
 
     // Reset daily counters for tomorrow
     this.customersServedToday = 0;

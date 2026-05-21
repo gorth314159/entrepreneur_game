@@ -59,8 +59,14 @@ export default class Town {
         customersServed: 0
       };
     });
-
     this.currentDailyLog = dailyLog;
+
+    // Execute auto-purchases for all properties that have auto-purchase enabled
+    properties.forEach(prop => {
+      if (typeof prop.performAutoPurchase === 'function') {
+        prop.performAutoPurchase(properties, this);
+      }
+    });
 
     // 1. Calculate general town economic health based on player activity
     // Economic health is higher if business prices are reasonable, ad campaigns are active, and cash flows.
