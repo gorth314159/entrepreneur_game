@@ -1,3 +1,5 @@
+import { TownDevelopmentManager } from './TownDevelopment.js';
+
 /**
  * Manages the autonomous town population, customer logic, economic health, and simulation phase.
  */
@@ -25,6 +27,7 @@ export default class Town {
     };
 
     this.townLedger = []; // Log of major economic events in the town
+    this.developmentManager = new TownDevelopmentManager();
   }
 
   /**
@@ -61,6 +64,9 @@ export default class Town {
     });
     this.currentDailyLog = dailyLog;
 
+    // Advance town projects first
+    this.developmentManager.advanceDay(this);
+
     // Execute auto-purchases for all properties that have auto-purchase enabled
     properties.forEach(prop => {
       if (typeof prop.performAutoPurchase === 'function') {
@@ -89,8 +95,12 @@ export default class Town {
 
     // 2. Adjust Town Population (Migration)
     // Population grows if economy is healthy, shrinks if poor
-    const populationChange = Math.round(this.population * (econHealth - 1.0) * 0.08);
-    this.population = Math.max(50, Math.min(500, this.population + populationChange));
+    const transitMultiplier = this.developmentManager.isProjectActive('public_transit') ? 1.5 : 1.0;
+    const heightsMultiplier = this.developmentManager.isProjectActive('aura_heights') ? 1.3 : 1.0;
+    const baseMigrationRate = 0.12; // increased from 0.08 to make population growth faster
+    const populationChange = Math.round(this.population * (econHealth - 1.0) * baseMigrationRate * transitMultiplier * heightsMultiplier);
+    const minPop = this.developmentManager.isProjectActive('public_transit') ? 100 : 50;
+    this.population = Math.max(minPop, Math.min(500, this.population + populationChange));
     
     if (populationChange > 0) {
       dailyLog.events.push(`${populationChange} new residents moved to town due to favorable economic conditions.`);
@@ -100,7 +110,8 @@ export default class Town {
 
     // 3. Shift Affluence
     // Affluence is based on average price index and population level
-    const currentScore = econHealth * (this.population / 150);
+    const affluenceBonus = this.developmentManager.isProjectActive('aura_heights') ? 0.3 : 0;
+    const currentScore = econHealth * (this.population / 150) + affluenceBonus;
     const prevAffluence = this.affluence;
     if (currentScore > 1.4) {
       this.affluence = 'High';
@@ -116,7 +127,8 @@ export default class Town {
 
     // 4. Simulate Customer Purchases (The Core Probability Loop)
     // Every resident makes a certain number of transaction attempts today based on affluence
-    const transactionsPerResident = this.affluence === 'High' ? 2 : this.affluence === 'Medium' ? 1.5 : 1.0;
+    const concertBonus = this.developmentManager.isProjectActive('concert_series') ? 0.5 : 0;
+    const transactionsPerResident = (this.affluence === 'High' ? 2 : this.affluence === 'Medium' ? 1.5 : 1.0) + concertBonus;
     const totalVisits = Math.floor(this.population * transactionsPerResident);
 
     // Group B2C properties by type for comparison

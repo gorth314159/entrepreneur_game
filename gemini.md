@@ -29,7 +29,8 @@ entrepreneur_game/
 │       ├── Map.js      # HTML5 Canvas rendering of grid, roads, properties & particles
 │       ├── Player.js   # Player state, debt, ledger, and skill upgrade modifiers
 │       ├── Property.js # Real estate classes (B2C, Farms, Apartments, Banks, AdServices)
-│       └── Town.js     # Simulation engine, migration, affluence & consumer choice probability
+│       ├── Town.js     # Simulation engine, migration, affluence & consumer choice probability
+│       └── TownDevelopment.js # Cooperative town upgrades, temporary events, and manager
 ```
 
 ---
@@ -101,6 +102,17 @@ Players can upgrade skills (exponential cost: $2000 \times 1.5^{\text{level} - 1
 - **Planning:** Lowers property purchase prices and maintenance costs by $4\%$ per level (max $40\%$).
 - **Marketing:** Increases ad package effectiveness by $15\%$ per level.
 - **Management:** Lowers operational and employee overhead by $5\%$ per level (max $50\%$).
+
+### 5. Cooperative Town Upgrades (`src/game/TownDevelopment.js`)
+Players can pool resources at any point during their turns to fund town-wide upgrades. Once fully funded, upgrades trigger powerful mechanics:
+- **Concert Series** (Cost: $12,000, Temporary - 8 days):
+  - **Effect:** Boosts resident daily transaction frequency by +0.5 attempts (e.g. Medium Affluence increases from 1.5 to 2.0 visits per resident).
+- **Public Transportation** (Cost: $20,000, Permanent):
+  - **Effect:** Multiplies daily population migration rate by 1.5x (50% faster growth) and sets a hard population floor at 100 residents.
+- **Business Expo** (Cost: $10,000, Temporary - 5 days):
+  - **Effect:** Immediately increases all businesses' ad awareness by +35% (up to a 100% cap) and clamps daily ad decay at a minimum of 25% (instead of decaying down to 10%).
+- **Aura Heights Housing** (Cost: $30,000, Permanent):
+  - **Effect:** Immediately increases town population by 30%, multiplies daily population migration rate by 1.3x, adds a +0.3 boost to the town economic rating score when calculating town affluence, and renders a gold-themed luxury housing estate in the canvas grid at (16,0).
 
 ---
 

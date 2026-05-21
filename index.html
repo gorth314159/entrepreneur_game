@@ -147,10 +147,11 @@
         </div>
         
         <!-- Action Panels: Bank Borrow / Repay Loans -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: auto; margin-bottom: 12px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: auto; margin-bottom: 8px;">
           <button id="btn-sidebar-loan" class="btn-action">Bank Services</button>
-          <button id="btn-sidebar-help" class="btn-action">Guide</button>
+          <button id="btn-sidebar-projects" class="btn-action">Town Projects</button>
         </div>
+        <button id="btn-sidebar-help" class="btn-action" style="margin-bottom: 12px; width: 100%;">Guide</button>
 
         <!-- End Turn Button -->
         <button id="btn-end-turn" class="btn-end-turn">End Turn</button>
@@ -189,6 +190,22 @@
         </div>
 
         <button id="btn-bank-close" class="btn-action" style="width: 100%; margin-top: 10px;">Close Services</button>
+      </div>
+    </div>
+
+    <!-- --- TOWN PROJECTS OVERLAY --- -->
+    <div class="bank-overlay" id="projects-overlay">
+      <div class="bank-card glass glass-glow" style="width: 480px; max-height: 85vh; display: flex; flex-direction: column;">
+        <h3 style="margin-bottom: 10px; color: var(--accent-cyan); text-align: center; font-size: 1.4rem; font-weight: 800; border-bottom: 1px solid var(--border-light); padding-bottom: 10px;">Town Upgrades</h3>
+        <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-bottom: 15px; line-height: 1.4;">
+          Pool cash with other players to unlock powerful town upgrades and local events.
+        </p>
+        
+        <div id="projects-list-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding-right: 5px; margin-bottom: 15px;">
+          <!-- Dynamically populated projects list -->
+        </div>
+
+        <button id="btn-projects-close" class="btn-action" style="width: 100%; margin-top: auto;">Close Upgrades</button>
       </div>
     </div>
 

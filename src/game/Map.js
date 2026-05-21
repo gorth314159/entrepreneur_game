@@ -31,14 +31,22 @@ export default class Map {
       cols: [4, 10, 15]
     };
 
-    // Residential zone definitions (for rendering houses that spawn customers)
-    this.residentialZones = [
+    // Town state (assigned dynamically)
+    this.town = null;
+
+    this.setupListeners();
+  }
+
+  getResidentialZones() {
+    const zones = [
       { name: 'Valley Estate', gridX: 1, gridY: 12, w: 3, h: 2 },
       { name: 'Metro Condos', gridX: 12, gridY: 0, w: 3, h: 2 },
       { name: 'Suburban Villas', gridX: 16, gridY: 8, w: 3, h: 2 }
     ];
-
-    this.setupListeners();
+    if (this.town && this.town.developmentManager && this.town.developmentManager.isProjectActive('aura_heights')) {
+      zones.push({ name: 'Aura Heights', gridX: 16, gridY: 0, w: 3, h: 2, isLuxury: true });
+    }
+    return zones;
   }
 
   setupListeners() {
@@ -107,7 +115,9 @@ export default class Map {
    */
   spawnCustomerParticles(businessProp, quantity = 5) {
     // Pick a random residential zone as source
-    const zone = this.residentialZones[Math.floor(Math.random() * this.residentialZones.length)];
+    const zones = this.getResidentialZones();
+    if (zones.length === 0) return;
+    const zone = zones[Math.floor(Math.random() * zones.length)];
     const startX = (zone.gridX + zone.w / 2) * this.cellW;
     const startY = (zone.gridY + zone.h / 2) * this.cellH;
 
@@ -212,20 +222,20 @@ export default class Map {
     });
 
     // 3. Draw Residential Zones (Houses)
-    this.residentialZones.forEach(zone => {
+    this.getResidentialZones().forEach(zone => {
       const zX = zone.gridX * this.cellW;
       const zY = zone.gridY * this.cellH;
       const zW = zone.w * this.cellW;
       const zH = zone.h * this.cellH;
 
       // Draw backdrop
-      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
-      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-      this.ctx.lineWidth = 1;
+      this.ctx.fillStyle = zone.isLuxury ? 'rgba(255, 215, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)';
+      this.ctx.strokeStyle = zone.isLuxury ? 'rgba(255, 215, 0, 0.3)' : 'rgba(255, 255, 255, 0.08)';
+      this.ctx.lineWidth = zone.isLuxury ? 1.5 : 1;
       this.drawRoundedRect(zX + 4, zY + 4, zW - 8, zH - 8, 8, true, true);
 
       // Render houses inside
-      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      this.ctx.fillStyle = zone.isLuxury ? 'rgba(255, 215, 0, 0.35)' : 'rgba(255, 255, 255, 0.15)';
       for (let i = 0; i < zone.w; i++) {
         for (let j = 0; j < zone.h; j++) {
           const houseX = zX + i * this.cellW + 10;
@@ -244,7 +254,7 @@ export default class Map {
       }
 
       // Draw Zone Label
-      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      this.ctx.fillStyle = zone.isLuxury ? 'rgba(255, 215, 0, 0.7)' : 'rgba(255, 255, 255, 0.4)';
       this.ctx.font = 'bold 9px "Outfit"';
       this.ctx.textAlign = 'center';
       this.ctx.fillText(zone.name.toUpperCase(), zX + zW / 2, zY + zH - 10);

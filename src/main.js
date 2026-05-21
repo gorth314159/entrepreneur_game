@@ -64,8 +64,14 @@ const playerLedgerList = document.getElementById('player-ledger-list');
 const btnEndTurn = document.getElementById('btn-end-turn');
 const btnSidebarLoan = document.getElementById('btn-sidebar-loan');
 const btnSidebarHelp = document.getElementById('btn-sidebar-help');
+const btnSidebarProjects = document.getElementById('btn-sidebar-projects');
 const btnBankClose = document.getElementById('btn-bank-close');
 const btnHelpClose = document.getElementById('btn-help-close');
+const btnProjectsClose = document.getElementById('btn-projects-close');
+
+// Projects Modal Elements
+const projectsOverlay = document.getElementById('projects-overlay');
+const projectsListContainer = document.getElementById('projects-list-container');
 
 // Bank Modal Elements
 const bankUserCash = document.getElementById('bank-user-cash');
@@ -176,6 +182,7 @@ function startGame() {
     selectedProperty = prop;
     updateUI();
   });
+  map.town = town;
 
   // Setup UI tabs listeners
   setupTabListeners();
@@ -797,6 +804,14 @@ function setupHUDActionListeners() {
     setTimeout(() => helpOverlay.style.display = 'none', 300);
   });
 
+  btnSidebarProjects.addEventListener('click', () => {
+    openProjectsOverlay();
+  });
+
+  btnProjectsClose.addEventListener('click', () => {
+    closeProjectsOverlay();
+  });
+
   btnNextDay.addEventListener('click', () => {
     proceedToNextDay();
   });
@@ -832,6 +847,146 @@ function setupHUDActionListeners() {
     player.repayDebt(10000);
     updateUI();
     updateBankOverlayUI(player, bankProp);
+  });
+}
+
+function openProjectsOverlay() {
+  renderProjectsOverlay();
+  projectsOverlay.style.display = 'flex';
+  setTimeout(() => projectsOverlay.classList.add('active'), 50);
+}
+
+function closeProjectsOverlay() {
+  projectsOverlay.classList.remove('active');
+  setTimeout(() => projectsOverlay.style.display = 'none', 300);
+}
+
+function renderProjectsOverlay() {
+  const player = players[currentPlayerIndex];
+  if (!player) return;
+
+  projectsListContainer.innerHTML = '';
+  
+  town.developmentManager.projects.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'glass';
+    card.style.padding = '15px';
+    card.style.borderRadius = '10px';
+    card.style.border = '1px solid var(--border-light)';
+    card.style.background = 'rgba(255, 255, 255, 0.02)';
+    card.style.display = 'flex';
+    card.style.flexDirection = 'column';
+    card.style.gap = '8px';
+
+    const percent = Math.min(100, Math.round((p.fundedAmount / p.cost) * 100));
+    
+    // Status Text and Color
+    let statusText = 'Inactive';
+    let statusColor = 'var(--text-muted)';
+    
+    if (p.type === 'permanent') {
+      if (p.isCompleted) {
+        statusText = 'Completed (Permanent)';
+        statusColor = 'var(--accent-gold)';
+      } else if (p.fundedAmount > 0) {
+        statusText = `Funding: $${p.fundedAmount.toLocaleString()} / $${p.cost.toLocaleString()} (${percent}%)`;
+        statusColor = 'var(--accent-cyan)';
+      }
+    } else {
+      if (p.activeDaysLeft > 0) {
+        statusText = `Active (${p.activeDaysLeft} days remaining)`;
+        statusColor = 'var(--accent-green)';
+      } else if (p.fundedAmount > 0) {
+        statusText = `Funding: $${p.fundedAmount.toLocaleString()} / $${p.cost.toLocaleString()} (${percent}%)`;
+        statusColor = 'var(--accent-cyan)';
+      }
+    }
+
+    card.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <strong style="font-size: 1rem; color: #ffffff;">${p.name}</strong>
+        <span style="font-size: 0.8rem; font-weight: 600; color: ${statusColor};">${statusText}</span>
+      </div>
+      <p style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; margin: 2px 0;">${p.description}</p>
+      
+      <!-- Progress Bar -->
+      <div style="height: 8px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; overflow: hidden; margin: 4px 0;">
+        <div style="height: 100%; width: ${percent}%; background: linear-gradient(90deg, var(--accent-green) 0%, var(--accent-cyan) 100%); transition: width 0.3s;"></div>
+      </div>
+    `;
+
+    // Only render contribution actions if project is not active / completed
+    const isActivePermanent = p.type === 'permanent' && p.isCompleted;
+    const isActiveTemporary = p.type === 'temporary' && p.activeDaysLeft > 0;
+    
+    if (!isActivePermanent && !isActiveTemporary) {
+      const actionsRow = document.createElement('div');
+      actionsRow.style.display = 'flex';
+      actionsRow.style.gap = '8px';
+      actionsRow.style.marginTop = '4px';
+
+      const contribs = [1000, 5000];
+      contribs.forEach(amount => {
+        const btn = document.createElement('button');
+        btn.className = 'btn-action';
+        btn.style.flex = '1';
+        btn.style.padding = '6px';
+        btn.style.fontSize = '0.8rem';
+        
+        const remaining = p.cost - p.fundedAmount;
+        const contribAmt = Math.min(amount, remaining);
+        btn.textContent = `+ $${contribAmt.toLocaleString()}`;
+        
+        btn.disabled = player.cash < contribAmt || remaining <= 0;
+        btn.addEventListener('click', () => {
+          town.developmentManager.contributeToProject(p.id, contribAmt, player, town);
+          updateUI();
+          renderProjectsOverlay();
+        });
+        actionsRow.appendChild(btn);
+      });
+
+      // Max contribution button
+      const btnMax = document.createElement('button');
+      btnMax.className = 'btn-action buy';
+      btnMax.style.flex = '1';
+      btnMax.style.padding = '6px';
+      btnMax.style.fontSize = '0.8rem';
+      
+      const maxRemaining = p.cost - p.fundedAmount;
+      const maxContrib = Math.min(player.cash, maxRemaining);
+      btnMax.textContent = `+ Max ($${maxContrib.toLocaleString()})`;
+      
+      btnMax.disabled = maxContrib <= 0;
+      btnMax.addEventListener('click', () => {
+        town.developmentManager.contributeToProject(p.id, maxContrib, player, town);
+        updateUI();
+        renderProjectsOverlay();
+      });
+      actionsRow.appendChild(btnMax);
+
+      card.appendChild(actionsRow);
+    } else if (isActivePermanent) {
+      const successText = document.createElement('div');
+      successText.style.fontSize = '0.78rem';
+      successText.style.color = 'var(--accent-gold)';
+      successText.style.textAlign = 'center';
+      successText.style.fontWeight = '600';
+      successText.style.padding = '4px 0';
+      successText.textContent = '✓ Upgrade Built Permanently';
+      card.appendChild(successText);
+    } else {
+      const successText = document.createElement('div');
+      successText.style.fontSize = '0.78rem';
+      successText.style.color = 'var(--accent-green)';
+      successText.style.textAlign = 'center';
+      successText.style.fontWeight = '600';
+      successText.style.padding = '4px 0';
+      successText.textContent = `✓ Event Active: ${p.activeDaysLeft} Days Left`;
+      card.appendChild(successText);
+    }
+
+    projectsListContainer.appendChild(card);
   });
 }
 

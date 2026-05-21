@@ -99,8 +99,9 @@ export class Property {
   /**
    * Decay ad awareness daily.
    */
-  decayAdAwareness() {
-    this.adAwareness = Math.max(0.1, this.adAwareness * 0.8); // 20% decay daily, minimum 0.1
+  decayAdAwareness(town) {
+    const minAd = (town && town.developmentManager && town.developmentManager.isProjectActive('business_expo')) ? 0.25 : 0.1;
+    this.adAwareness = Math.max(minAd, this.adAwareness * 0.8); // 20% decay daily
   }
 
   /**
@@ -108,7 +109,7 @@ export class Property {
    */
   simulateDay(town) {
     // Overridden by sub-classes
-    this.decayAdAwareness();
+    this.decayAdAwareness(town);
   }
 }
 
