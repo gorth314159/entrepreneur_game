@@ -133,8 +133,8 @@ export default class Player {
    */
   getSkillUpgradeCost(skillName) {
     const currentLevel = this.skills[skillName];
-    // Base cost is 2000, doubling each level
-    return 2000 * Math.pow(1.5, currentLevel - 1);
+    // Base cost is 200, multiplying by 1.5 each level
+    return 200 * Math.pow(1.5, currentLevel - 1);
   }
 
   // --- Skill Modifiers ---

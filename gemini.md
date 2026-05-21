@@ -96,7 +96,7 @@ $$\text{Score} = \text{Ad Multiplier} \times \text{Satisfaction Multiplier} \tim
 - **Ad Services (`AdServices`)** collects base marketing retainer contracts from the town. When other players buy ad campaigns, 90% of the price is paid to the Ad Services owner.
 
 ### 4. Player Skills & Modifiers (`Player.js`)
-Players can upgrade skills (exponential cost: $2000 \times 1.5^{\text{level} - 1}$):
+Players can upgrade skills (exponential cost: $200 \times 1.5^{\text{level} - 1}$):
 - **Technology:** Reduces equipment upgrade costs by $5\%$ per level (max $50\%$).
 - **Social:** Reduces interest rates and boosts customer satisfaction by $3\%$ per level.
 - **Planning:** Lowers property purchase prices and maintenance costs by $4\%$ per level (max $40\%$).
