@@ -32,12 +32,14 @@ export default class Player {
    * Calculates the Net Worth of the player.
    * Net Worth = Cash + Asset Value - Debt
    * @param {Array} properties - List of all properties in the game
+   * @param {boolean} isEndgame - Whether this is the final endgame calculation
    * @returns {number}
    */
-  getNetWorth(properties) {
+  getNetWorth(properties, isEndgame = false) {
     const ownedProperties = properties.filter(p => p.owner === this);
     const assetValue = ownedProperties.reduce((sum, p) => sum + p.getValue(), 0);
-    return this.cash + assetValue - this.debt;
+    const penalty = isEndgame && this.debt > 0 ? Math.round(this.debt * 0.20) : 0;
+    return this.cash + assetValue - this.debt - penalty;
   }
 
   /**

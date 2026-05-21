@@ -108,7 +108,7 @@ Players can pool resources at any point during their turns to fund town-wide upg
 - **Concert Series** (Cost: $12,000, Temporary - 8 days):
   - **Effect:** Boosts resident daily transaction frequency by +0.5 attempts (e.g. Medium Affluence increases from 1.5 to 2.0 visits per resident).
 - **Public Transportation** (Cost: $20,000, Permanent):
-  - **Effect:** Multiplies daily population migration rate by 1.5x (50% faster growth) and sets a hard population floor at 100 residents.
+  - **Effect:** Increases daily population growth rate by 50%, reduces population decline rate by 33% (divides decline by 1.5), and sets a hard population floor at 100 residents.
 - **Business Expo** (Cost: $10,000, Temporary - 5 days):
   - **Effect:** Immediately increases all businesses' ad awareness by +35% (up to a 100% cap) and clamps daily ad decay at a minimum of 25% (instead of decaying down to 10%).
 - **Aura Heights Housing** (Cost: $30,000, Permanent):

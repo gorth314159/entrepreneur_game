@@ -95,11 +95,22 @@ export default class Town {
 
     // 2. Adjust Town Population (Migration)
     // Population grows if economy is healthy, shrinks if poor
-    const transitMultiplier = this.developmentManager.isProjectActive('public_transit') ? 1.5 : 1.0;
-    const heightsMultiplier = this.developmentManager.isProjectActive('aura_heights') ? 1.3 : 1.0;
+    const isTransitActive = this.developmentManager.isProjectActive('public_transit');
+    const isHeightsActive = this.developmentManager.isProjectActive('aura_heights');
+    
+    let transitMultiplier = 1.0;
+    if (isTransitActive) {
+      if (econHealth >= 1.0) {
+        transitMultiplier = 1.5;
+      } else {
+        transitMultiplier = 1 / 1.5;
+      }
+    }
+    
+    const heightsMultiplier = isHeightsActive ? 1.3 : 1.0;
     const baseMigrationRate = 0.12; // increased from 0.08 to make population growth faster
     const populationChange = Math.round(this.population * (econHealth - 1.0) * baseMigrationRate * transitMultiplier * heightsMultiplier);
-    const minPop = this.developmentManager.isProjectActive('public_transit') ? 100 : 50;
+    const minPop = isTransitActive ? 100 : 50;
     this.population = Math.max(minPop, Math.min(500, this.population + populationChange));
     
     if (populationChange > 0) {

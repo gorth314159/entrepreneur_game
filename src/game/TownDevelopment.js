@@ -96,7 +96,7 @@ export class TownDevelopmentManager {
         id: 'public_transit',
         name: 'Public Transportation',
         cost: 20000,
-        description: 'Establish a town-wide clean trolley line. Increases daily population growth rate by 50% and sets the minimum population floor to 100.',
+        description: 'Establish a town-wide clean trolley line. Increases daily population growth rate by 50%, reduces population decline by 33%, and sets the minimum population floor to 100.',
         type: 'permanent'
       }),
       new TownDevelopmentProject({

@@ -79,6 +79,8 @@ const bankUserDebt = document.getElementById('bank-user-debt');
 const bankInterestRate = document.getElementById('bank-interest-rate');
 const btnBankBorrow = document.getElementById('btn-bank-borrow');
 const btnBankRepay = document.getElementById('btn-bank-repay');
+const bankPenaltyWarning = document.getElementById('bank-penalty-warning');
+const projectedDebtPenalty = document.getElementById('projected-debt-penalty');
 
 // Simulation Modal Elements
 const simDayTitle = document.getElementById('sim-day-title');
@@ -1010,6 +1012,17 @@ function updateBankOverlayUI(player, bankProp) {
   
   bankInterestRate.textContent = `${(userRate * 100).toFixed(1)}% (Base: ${(baseRate * 100).toFixed(0)}%)`;
 
+  // Update endgame penalty warning dynamically
+  if (bankPenaltyWarning && projectedDebtPenalty) {
+    if (player.debt > 0) {
+      bankPenaltyWarning.style.display = 'flex';
+      const penaltyAmt = Math.round(player.debt * 0.20);
+      projectedDebtPenalty.textContent = `-$${penaltyAmt.toLocaleString()}`;
+    } else {
+      bankPenaltyWarning.style.display = 'none';
+    }
+  }
+
   // Borrow button state
   // Can borrow if debt doesn't exceed 50k limit
   btnBankBorrow.disabled = player.debt >= 50000;
@@ -1025,29 +1038,45 @@ function closeBankOverlay() {
   setTimeout(() => bankOverlay.style.display = 'none', 300);
 }
 
-// --- ENDGAME OVERLAYS & RANKING ---
-
 function showEndgameScreen() {
-  // Sort players by final Net Worth (descending)
+  // Sort players by final Net Worth (descending, with endgame penalty applied)
   const ranked = [...players].sort((a, b) => {
-    return b.getNetWorth(properties) - a.getNetWorth(properties);
+    return b.getNetWorth(properties, true) - a.getNetWorth(properties, true);
   });
 
   endgameLeaderboard.innerHTML = '';
   ranked.forEach((p, idx) => {
     const row = document.createElement('div');
     row.className = `leaderboard-row ${idx === 0 ? 'winner' : ''}`;
+    row.style.flexDirection = 'column';
+    row.style.alignItems = 'stretch';
+    row.style.gap = '8px';
     
     const rankText = idx === 0 ? '🏆 1' : `${idx + 1}`;
-    const nw = p.getNetWorth(properties);
+    const nw = p.getNetWorth(properties, true);
     
+    // Calculate values for breakdown
+    const owned = properties.filter(prop => prop.owner === p);
+    const assetValue = owned.reduce((sum, prop) => sum + prop.getValue(), 0);
+    const penalty = p.debt > 0 ? Math.round(p.debt * 0.20) : 0;
+
     row.innerHTML = `
-      <div class="rank-badge">${rankText}</div>
-      <div class="leaderboard-row-name">
-        <div class="player-color-dot" style="background-color: ${p.color}"></div>
-        <span>${p.name}</span>
+      <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="rank-badge">${rankText}</div>
+          <div class="leaderboard-row-name">
+            <div class="player-color-dot" style="background-color: ${p.color}"></div>
+            <span>${p.name}</span>
+          </div>
+        </div>
+        <div class="leaderboard-row-networth">$${nw.toLocaleString()}</div>
       </div>
-      <div class="leaderboard-row-networth">$${nw.toLocaleString()}</div>
+      <div class="leaderboard-breakdown" style="display: flex; flex-wrap: wrap; gap: 15px; font-size: 0.8rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px; margin-top: 4px; color: var(--text-muted);">
+        <div>Cash: <span style="color: var(--accent-green); font-weight: 600;">$${p.cash.toLocaleString()}</span></div>
+        <div>Assets: <span style="color: var(--accent-cyan); font-weight: 600;">$${assetValue.toLocaleString()}</span></div>
+        <div>Debt: <span style="color: var(--accent-pink); font-weight: 600;">-$${p.debt.toLocaleString()}</span></div>
+        <div>Debt Penalty (20%): <span style="color: ${p.debt > 0 ? 'var(--accent-pink)' : 'var(--text-muted)'}; font-weight: 600;">${p.debt > 0 ? `-$${penalty.toLocaleString()}` : '$0'}</span></div>
+      </div>
     `;
     endgameLeaderboard.appendChild(row);
   });

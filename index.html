@@ -172,6 +172,15 @@
           <span class="lbl">Outstanding Debt:</span>
           <span class="val" id="bank-user-debt" style="color: var(--accent-pink)">$0</span>
         </div>
+        <div class="bank-row penalty-warning" id="bank-penalty-warning" style="display: none; flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px; background: rgba(244, 63, 94, 0.08); border: 1px solid rgba(244, 63, 94, 0.2); border-radius: 6px; margin-bottom: 12px; width: 100%;">
+          <span style="color: var(--accent-pink); font-size: 0.8rem; font-weight: 700;">⚠️ Debt Penalty Warning</span>
+          <span style="color: var(--text-muted); font-size: 0.75rem; line-height: 1.4;">
+            Unpaid debt at the end of the game will incur a <strong>20% Net Worth penalty</strong>.
+          </span>
+          <span style="color: var(--text-main); font-size: 0.75rem;">
+            Projected Penalty: <strong style="color: var(--accent-pink);" id="projected-debt-penalty">-$0</strong>
+          </span>
+        </div>
         <div class="bank-row">
           <span class="lbl">Base Interest Rate:</span>
           <span class="val" id="bank-interest-rate" style="color: var(--accent-cyan)">12.0%</span>
@@ -283,7 +292,7 @@
           
           <p><strong style="color: var(--text-main)">4. Ad Campaigns:</strong> Buy campaigns from AdServices to spike advertising awareness. If player-owned, the transaction fee goes to the AdServices owner.</p>
           
-          <p><strong style="color: var(--text-main)">5. Bank Services:</strong> Take loans or repay debt. Loans accrue daily interest. If a player owns the bank, all loan interest goes to their cash balance!</p>
+          <p><strong style="color: var(--text-main)">5. Bank Services:</strong> Take loans or repay debt. Loans accrue daily interest. If a player owns the bank, all loan interest goes to their cash balance! <strong>Warning: Unpaid debt at the end of the game incurs a 20% penalty.</strong></p>
           
           <p><strong style="color: var(--text-main)">6. Skills Upgrade:</strong> Spend cash to level up 5 key skills (Technology, Social, Planning, Marketing, Management) to receive powerful operational discounts and bonuses.</p>
         </div>
