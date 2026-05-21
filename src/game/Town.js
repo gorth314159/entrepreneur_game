@@ -54,6 +54,8 @@ export default class Town {
         name: p.name,
         color: p.color,
         revenue: 0,
+        cogs: 0,
+        income: 0,
         customersServed: 0
       };
     });
@@ -228,6 +230,15 @@ export default class Town {
     dailyLog.populationAfter = this.population;
     dailyLog.affluenceAfter = this.affluence;
     dailyLog.economicHealth = econHealth;
+
+    // Calculate net income for each player
+    players.forEach(p => {
+      const metrics = dailyLog.playerMetrics[p.id];
+      if (metrics) {
+        metrics.income = metrics.revenue - metrics.cogs;
+      }
+    });
+
     this.townLedger.push(dailyLog);
 
     // Increment day
@@ -290,6 +301,15 @@ export default class Town {
     if (this.currentDailyLog && this.currentDailyLog.playerMetrics[playerId]) {
       this.currentDailyLog.playerMetrics[playerId].revenue += amount;
       this.currentDailyLog.playerMetrics[playerId].customersServed += customersCount;
+    }
+  }
+
+  /**
+   * Helper to record daily COGS for a specific player during simulation.
+   */
+  recordPlayerCogs(playerId, amount) {
+    if (this.currentDailyLog && this.currentDailyLog.playerMetrics[playerId]) {
+      this.currentDailyLog.playerMetrics[playerId].cogs += amount;
     }
   }
 

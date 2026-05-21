@@ -256,7 +256,7 @@ function runSimulationPhase() {
   if (playerBreakdownContainer) {
     playerBreakdownContainer.innerHTML = '';
     players.forEach(p => {
-      const metrics = log.playerMetrics[p.id] || { revenue: 0, customersServed: 0 };
+      const metrics = log.playerMetrics[p.id] || { revenue: 0, cogs: 0, income: 0, customersServed: 0 };
       const row = document.createElement('div');
       row.className = 'glass';
       row.style.display = 'flex';
@@ -268,11 +268,18 @@ function runSimulationPhase() {
       row.style.background = 'rgba(255, 255, 255, 0.03)';
       row.style.fontSize = '0.85rem';
 
+      const cogs = metrics.cogs || 0;
+      const income = metrics.income !== undefined ? metrics.income : (metrics.revenue - cogs);
+
       row.innerHTML = `
         <span style="font-weight:600; color:${p.color};">${p.name}</span>
-        <div style="display:flex; gap:16px;">
-          <span>Revenue: <strong style="color:var(--accent-green);">$${metrics.revenue.toLocaleString()}</strong></span>
-          <span>Served: <strong style="color:var(--accent-cyan);">${metrics.customersServed}</strong></span>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
+          <div style="display:flex; gap:12px; font-size:0.8rem;">
+            <span>Rev: <strong style="color:var(--accent-green);">$${metrics.revenue.toLocaleString()}</strong></span>
+            <span>COGS: <strong style="color:var(--accent-pink);">$${cogs.toLocaleString()}</strong></span>
+            <span>Income: <strong style="color:${income >= 0 ? 'var(--accent-cyan)' : 'var(--accent-red)'};">$${income.toLocaleString()}</strong></span>
+          </div>
+          <span style="font-size:0.75rem; color:var(--text-muted);">Served: <strong style="color:var(--text-main);">${metrics.customersServed}</strong></span>
         </div>
       `;
       playerBreakdownContainer.appendChild(row);
@@ -613,7 +620,7 @@ function renderInspectorPanel() {
           const totalCost = qty * selectedProperty.emergencyImportCost;
           if (player.cash >= totalCost) {
             player.cash -= totalCost;
-            selectedProperty.rawGoodsInventory += qty;
+            selectedProperty.addToInventory(qty, selectedProperty.emergencyImportCost);
             player.logTransaction('Emergency Import Restock', -totalCost, `Imported ${qty} goods for ${selectedProperty.name}`);
             updateUI();
           } else {
@@ -629,7 +636,8 @@ function renderInspectorPanel() {
               return;
             }
             const totalCost = avail * farm.wholesalePrice;
-            if (player.cash >= totalCost) {
+            const isOwnFarm = farm.owner === player;
+            if (isOwnFarm || player.cash >= totalCost) {
               const bought = selectedProperty.restockFromFarm(farm, avail);
               if (bought > 0) {
                 updateUI();
