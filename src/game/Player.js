@@ -13,6 +13,9 @@ export default class Player {
     this.name = name;
     this.color = color;
     this.cash = startingCash;
+    this.pendingSaleCash = 0; // Cash pending till the end of turn
+    this.regularDebt = 0;
+    this.projectDebt = 0;
     this.debt = 0;
 
     // Skills are rated 0-10
@@ -30,7 +33,7 @@ export default class Player {
 
   /**
    * Calculates the Net Worth of the player.
-   * Net Worth = Cash + Asset Value - Debt
+   * Net Worth = Cash + Pending Sale Cash + Asset Value - Debt
    * @param {Array} properties - List of all properties in the game
    * @param {boolean} isEndgame - Whether this is the final endgame calculation
    * @returns {number}
@@ -39,7 +42,7 @@ export default class Player {
     const ownedProperties = properties.filter(p => p.owner === this);
     const assetValue = ownedProperties.reduce((sum, p) => sum + p.getValue(), 0);
     const penalty = isEndgame && this.debt > 0 ? Math.round(this.debt * 0.20) : 0;
-    return this.cash + assetValue - this.debt - penalty;
+    return this.cash + (this.pendingSaleCash || 0) + assetValue - this.debt - penalty;
   }
 
   /**
@@ -48,7 +51,7 @@ export default class Player {
    * @param {number} interestRate - The base interest rate from the bank
    */
   borrow(amount, interestRate) {
-    if (this.debt + amount > 50000) {
+    if (this.regularDebt + amount > 50000) {
       return null;
     }
     // Interest rate discount from social skill
@@ -57,7 +60,8 @@ export default class Player {
     const adjustedRate = interestRate * (1 - discount);
     
     this.cash += amount;
-    this.debt += amount;
+    this.regularDebt += amount;
+    this.debt = this.regularDebt + this.projectDebt;
     
     this.logTransaction('Loan Borrowed', amount, `Borrowed at ${(adjustedRate * 100).toFixed(1)}% interest`);
     return adjustedRate;
@@ -70,7 +74,22 @@ export default class Player {
   repayDebt(amount) {
     const payment = Math.min(amount, this.debt, this.cash);
     this.cash -= payment;
-    this.debt -= payment;
+    
+    if (payment > 0) {
+      let remainingPayment = payment;
+      if (this.regularDebt > 0) {
+        const rep = Math.min(remainingPayment, this.regularDebt);
+        this.regularDebt -= rep;
+        remainingPayment -= rep;
+      }
+      if (remainingPayment > 0 && this.projectDebt > 0) {
+        const rep = Math.min(remainingPayment, this.projectDebt);
+        this.projectDebt -= rep;
+        remainingPayment -= rep;
+      }
+      this.debt = this.regularDebt + this.projectDebt;
+    }
+
     this.logTransaction('Loan Repayment', -payment, `Paid off ${payment} debt`);
     return payment;
   }
@@ -87,7 +106,14 @@ export default class Player {
     const adjustedRate = rate * (1 - discount);
     const interest = Math.round(this.debt * adjustedRate);
     
-    this.debt += interest;
+    if (interest > 0) {
+      const regShare = this.debt > 0 ? Math.round(interest * (this.regularDebt / this.debt)) : 0;
+      const projShare = interest - regShare;
+      this.regularDebt += regShare;
+      this.projectDebt += projShare;
+      this.debt = this.regularDebt + this.projectDebt;
+    }
+
     this.logTransaction('Interest Accrued', -interest, `Accrued interest on debt`);
     return interest;
   }

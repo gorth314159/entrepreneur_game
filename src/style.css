@@ -248,6 +248,9 @@ body {
   border-radius: 8px;
   cursor: default;
   display: block;
+  max-width: 95%;
+  max-height: 95%;
+  object-fit: contain;
 }
 
 .canvas-hud {
@@ -668,6 +671,17 @@ body {
   color: black;
 }
 
+.btn-action.sell {
+  background: rgba(244, 63, 94, 0.1);
+  border-color: var(--accent-pink);
+  color: white;
+}
+.btn-action.sell:hover:not(:disabled) {
+  background: var(--accent-pink);
+  color: black;
+}
+
+
 /* Specific Business Forms inside Inspector */
 .inspector-input-group {
   display: flex;
@@ -945,4 +959,34 @@ body {
   font-weight: 800;
   font-size: 1.2rem;
   color: var(--accent-green);
+}
+
+/* --- Onboarding Spotlight Highlight & Styles --- */
+.onboarding-highlight {
+  z-index: 10002 !important;
+  position: relative !important;
+  border-color: var(--accent-cyan) !important;
+  animation: onboarding-pulse 2s infinite alternate !important;
+  transition: all 0.3s ease-in-out;
+}
+
+.sidebar.onboarding-sidebar-active {
+  z-index: 10001 !important;
+  position: relative !important;
+  pointer-events: none !important;
+}
+
+@keyframes onboarding-pulse {
+  0% {
+    box-shadow: 0 0 10px rgba(0, 242, 254, 0.4), 
+                0 0 0 1px var(--accent-cyan);
+  }
+  100% {
+    box-shadow: 0 0 25px rgba(0, 242, 254, 0.8), 
+                0 0 0 2px var(--accent-cyan);
+  }
+}
+
+#btn-onboarding-skip:hover {
+  color: var(--accent-pink) !important;
 }

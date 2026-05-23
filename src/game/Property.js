@@ -20,6 +20,9 @@ export class Property {
     // B2C & General factors
     this.customerSatisfaction = 0.75; // 0.0 to 1.0
     this.adAwareness = 0.1; // 0.0 to 1.0 (multiplier for foot traffic)
+
+    this.soldToBankBy = []; // List of player IDs who sold this property to the bank
+    this.purchaseDay = null; // Day of purchase
   }
 
   /**
@@ -46,12 +49,21 @@ export class Property {
   /**
    * Checks if player can afford property and purchases it.
    */
-  purchase(player) {
+  purchase(player, currentDay = null) {
     const price = this.getPurchasePrice(player);
     if (player.cash >= price && this.owner === null) {
       player.cash -= price;
       this.owner = player;
+      this.purchaseDay = currentDay;
       player.logTransaction('Property Purchase', -price, `Purchased ${this.name}`);
+      
+      // Remove from soldToBankBy if present
+      if (this.soldToBankBy && player) {
+        const idx = this.soldToBankBy.indexOf(player.id);
+        if (idx !== -1) {
+          this.soldToBankBy.splice(idx, 1);
+        }
+      }
       return true;
     }
     return false;
@@ -61,6 +73,10 @@ export class Property {
    * Calculates the purchase price including player Planning discount.
    */
   getPurchasePrice(player) {
+    // If the player previously sold this property to the bank, they must buy it back at full price.
+    if (player && this.soldToBankBy && this.soldToBankBy.includes(player.id)) {
+      return this.basePrice;
+    }
     const discount = player ? player.getPlanningModifier() : 0;
     return Math.round(this.basePrice * (1 - discount));
   }
@@ -105,6 +121,17 @@ export class Property {
   }
 
   /**
+   * Resets the property to town ownership and default state.
+   */
+  reset() {
+    this.owner = null;
+    this.upgradeLevel = 1;
+    this.customerSatisfaction = 0.75;
+    this.adAwareness = 0.1;
+    this.purchaseDay = null; // Reset purchase day
+  }
+
+  /**
    * Abstract day simulation logic.
    */
   simulateDay(town) {
@@ -129,6 +156,13 @@ export class Bank extends Property {
    */
   setInterestRate(rate) {
     this.interestRate = Math.max(0.05, Math.min(0.50, rate));
+  }
+
+  reset() {
+    super.reset();
+    this.interestRate = 0.15;
+    this.totalLoansIssued = 0;
+    this.totalInterestCollected = 0;
   }
 
   simulateDay(town) {
@@ -184,6 +218,11 @@ export class AdServices extends Property {
     targetProperty.adAwareness = Math.min(1.0, targetProperty.adAwareness + effectiveness);
 
     return true;
+  }
+
+  reset() {
+    super.reset();
+    this.campaignPrice = 1500;
   }
 
   simulateDay(town) {
@@ -338,12 +377,47 @@ export class Farm extends Property {
     this.unitsSoldLastSimulation = this.unitsSoldToday;
     this.unitsSoldToday = 0;
   }
+
+  reset() {
+    super.reset();
+    this.wholesalePrice = 15;
+    this.inventory = 40;
+    this.unitsSoldToday = 0;
+    this.unitsSoldLastSimulation = 0;
+  }
 }
 
 /**
  * B2C Property: Serves town customers directly.
  */
 export class B2CProperty extends Property {
+  static allProperties = [];
+
+  get benchmarkPrice() {
+    switch (this.type) {
+      case 'GroceryStore': return 25;
+      case 'Restaurant': return 45;
+      case 'RetailStore': return 35;
+      case 'MechanicShop': return 60;
+      default: return 30;
+    }
+  }
+
+  get emergencyImportCost() {
+    const list = B2CProperty.allProperties || [];
+    const sameTypeProps = list.filter(p => p.type === this.type);
+    const farms = list.filter(p => p.type === 'Farm');
+    const allPrices = [
+      ...sameTypeProps.map(p => p.price || 0),
+      ...farms.map(p => p.wholesalePrice || 0)
+    ];
+    if (allPrices.length === 0) {
+      return this.type === 'GroceryStore' ? 18 : 28;
+    }
+    const maxPrice = Math.max(...allPrices);
+    return Math.ceil(maxPrice * 1.05);
+  }
+
   constructor(id, name, type, gridX, gridY, width, height, basePrice, baseMaintenance) {
     let price = basePrice;
     let maint = baseMaintenance;
@@ -372,13 +446,11 @@ export class B2CProperty extends Property {
         this.price = 25; // price charged per unit
         this.capacity = 35; // base customer capacity
         this.requiresGoods = true;
-        this.emergencyImportCost = 18;
         break;
       case 'Restaurant':
         this.price = 45;
         this.capacity = 25;
         this.requiresGoods = true;
-        this.emergencyImportCost = 28;
         break;
       case 'RetailStore':
         this.price = 35;
@@ -602,6 +674,25 @@ export class B2CProperty extends Property {
     this.cogsToday = 0;
     super.simulateDay(town);
   }
+
+  reset() {
+    super.reset();
+    this.rawGoodsInventory = 0;
+    this.customersServedToday = 0;
+    this.revenueToday = 0;
+    this.cogsToday = 0;
+    this.averageUnitCost = 15;
+    this.autoPurchaseEnabled = false;
+    this.autoPurchaseAmount = 20;
+    this.autoPurchaseSource = 'market';
+    this.customersServedLastSimulation = 0;
+    switch (this.type) {
+      case 'GroceryStore': this.price = 25; break;
+      case 'Restaurant': this.price = 45; break;
+      case 'RetailStore': this.price = 35; break;
+      case 'MechanicShop': this.price = 60; break;
+    }
+  }
 }
 
 /**
@@ -667,5 +758,11 @@ export class Apartments extends Property {
     }
 
     super.simulateDay(town);
+  }
+
+  reset() {
+    super.reset();
+    this.rent = 45;
+    this.tenants = 0;
   }
 }

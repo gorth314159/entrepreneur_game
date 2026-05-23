@@ -88,7 +88,7 @@ $$\text{Score} = \text{Ad Multiplier} \times \text{Satisfaction Multiplier} \tim
 - **Farms** produce raw goods daily.
 - **Grocery Stores** and **Restaurants** require raw goods to serve customers.
 - **Owned transfers are cash-free** between a player's farm and their retail properties. Non-owned transfers cost the Farm's `wholesalePrice`.
-- If a business runs out of stock, it pays **Emergency Market Import Costs** ($18 for Groceries, $28 for Restaurants) per customer, severely denting margins.
+- If a business runs out of stock, it pays **Emergency Market Import Costs** (always 5% higher than the highest selling price of all corresponding properties in town, initially $18 for Groceries and $28 for Restaurants) per customer, severely denting margins.
 - **Auto-Purchase:** Players can set B2C properties to auto-buy stock from specific farms or the emergency market at the start of each simulation phase.
 
 ### 3. Bank and Ad Services Monopolies
@@ -124,7 +124,7 @@ To maintain project quality and runtime stability, you **must** adhere to the fo
 1. **OS:** Windows 10/11 using PowerShell. **Do not use `&&`** to chain commands; run them as separate lines or use semi-colons (`;`).
 2. **Python Environment:** If executing any Python scripts in this workspace, you **must** use the local virtual environment `.venv`:
    - Run python using: `.venv\Scripts\python.exe`
-3. **NPM Commands:** Use `npm run dev` to start the local Vite development server. Use `npm run build` to verify production bundle integrity.
+3. **NPM Commands:** Do not run `npm run dev` to start the development server as it is already running. Use `npm run build` to verify production bundle integrity.
 
 ### 🎨 Design & Aesthetic Guidelines
 1. **Premium Aesthetic:** The user experience should feel high-end, utilizing dark modes, HSL-tailored colors, and glassmorphism.
@@ -142,6 +142,6 @@ To maintain project quality and runtime stability, you **must** adhere to the fo
 
 ## 🚀 Speeding Up Development: Quick Commands
 
-- **Start Dev Server:** `npm run dev`
+- **Start Dev Server:** *Already running (do not launch)*
 - **Build Project:** `npm run build`
 - **Preview Production Build:** `npm run preview`

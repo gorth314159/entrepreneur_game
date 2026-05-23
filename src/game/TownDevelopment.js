@@ -13,6 +13,11 @@ export class TownDevelopmentProject {
     this.fundedAmount = 0;
     this.activeDaysLeft = 0; // days left for temporary events
     this.isCompleted = false; // status for permanent upgrades
+
+    // Joint Venture Proposal State
+    this.jvActive = false;
+    this.jvParticipants = []; // Array of player IDs (e.g. ['p_0', 'p_1'])
+    this.jvFundingMethods = {}; // { playerId: 'cash' | 'loan' }
   }
 
   /**
@@ -59,6 +64,148 @@ export class TownDevelopmentProject {
     }
 
     return contribution;
+  }
+
+  /**
+   * Starts a Joint Venture proposal.
+   */
+  startJointVenture() {
+    this.jvActive = true;
+    this.jvParticipants = [];
+    this.jvFundingMethods = {};
+  }
+
+  /**
+   * Cancels a Joint Venture proposal.
+   */
+  cancelJointVenture() {
+    this.jvActive = false;
+    this.jvParticipants = [];
+    this.jvFundingMethods = {};
+  }
+
+  /**
+   * Toggles a participant in the Joint Venture.
+   */
+  toggleJvParticipant(playerId) {
+    const idx = this.jvParticipants.indexOf(playerId);
+    if (idx > -1) {
+      this.jvParticipants.splice(idx, 1);
+      delete this.jvFundingMethods[playerId];
+    } else {
+      this.jvParticipants.push(playerId);
+      this.jvFundingMethods[playerId] = 'cash'; // default
+    }
+  }
+
+  /**
+   * Sets the funding method for a participant.
+   */
+  setJvFundingMethod(playerId, method) {
+    if (this.jvParticipants.includes(playerId)) {
+      this.jvFundingMethods[playerId] = method;
+    }
+  }
+
+  /**
+   * Executes the Joint Venture by gathering funding from all participants.
+   * Returns true if successful, false otherwise.
+   */
+  executeJointVenture(players, town) {
+    if (!this.jvActive || this.jvParticipants.length < 2) return false;
+
+    const remaining = this.cost - this.fundedAmount;
+    if (remaining <= 0) return false;
+
+    const share = Math.ceil(remaining / this.jvParticipants.length);
+
+    // Verify cash for cash-funded participants
+    for (const playerId of this.jvParticipants) {
+      const player = players.find(p => p.id === playerId);
+      if (!player) return false;
+      const method = this.jvFundingMethods[playerId] || 'cash';
+      if (method === 'cash' && player.cash < share) {
+        return false; // Player cannot afford their share of cash contribution
+      }
+    }
+
+    // Execute contribution
+    let totalContributed = 0;
+    this.jvParticipants.forEach((playerId, index) => {
+      const player = players.find(p => p.id === playerId);
+      const method = this.jvFundingMethods[playerId] || 'cash';
+      
+      const actualShare = (index === this.jvParticipants.length - 1) ? (remaining - totalContributed) : share;
+
+      if (method === 'cash') {
+        player.cash -= actualShare;
+        player.logTransaction('Town Project Fund (JV)', -actualShare, `Contributed to ${this.name} via Joint Venture`);
+      } else {
+        // Take loan bypass
+        const bankProp = town.currentProperties
+          ? town.currentProperties.filter(p => p.type === 'Bank').sort((a, b) => a.interestRate - b.interestRate)[0]
+          : null;
+        const baseRate = bankProp ? bankProp.interestRate : 0.18;
+        const discount = Math.min(0.5, (player.skills.social - 1) * 0.05);
+        const adjustedRate = baseRate * (1 - discount);
+
+        player.projectDebt += actualShare;
+        player.debt = player.regularDebt + player.projectDebt;
+
+        player.logTransaction('Town Project Loan (JV)', actualShare, `Borrowed for ${this.name} Joint Venture at ${(adjustedRate * 100).toFixed(1)}% interest`);
+        player.logTransaction('Town Project Fund (JV)', -actualShare, `Contributed to ${this.name} via Joint Venture`);
+        
+        if (bankProp) {
+          bankProp.totalLoansIssued++;
+        }
+      }
+
+      this.fundedAmount += actualShare;
+      totalContributed += actualShare;
+    });
+
+    // Mark as completed if fully funded
+    if (this.isFullyFunded()) {
+      if (this.type === 'permanent') {
+        this.isCompleted = true;
+      } else {
+        this.activeDaysLeft = this.duration;
+      }
+
+      let logMsg = `🎉 Town Project Completed: ${this.name} (Joint Venture by ${this.jvParticipants.map(pid => players.find(p => p.id === pid).name).join(', ')})!`;
+
+      if (this.id === 'business_expo') {
+        if (town && town.currentProperties) {
+          town.currentProperties.forEach(prop => {
+            if (prop.adAwareness !== undefined) {
+              prop.adAwareness = Math.min(1.0, prop.adAwareness + 0.35);
+            }
+          });
+        }
+        logMsg += ` All businesses have gained +35% advertising awareness.`;
+      } else if (this.id === 'aura_heights') {
+        let popBoostText = '';
+        if (town) {
+          const popBoost = Math.round(town.population * 0.30);
+          town.population += popBoost;
+          popBoostText = ` Immediately added +${popBoost.toLocaleString()} residents (population is now ${town.population.toLocaleString()}).`;
+        }
+        logMsg += ` A new luxury housing sector has been constructed on the map.${popBoostText}`;
+      }
+
+      if (town && town.currentDailyLog) {
+        town.currentDailyLog.events.push(logMsg);
+      } else if (town) {
+        town.townLedger.push({
+          day: town.day,
+          type: 'project_completed',
+          events: [logMsg]
+        });
+      }
+    }
+
+    this.cancelJointVenture();
+    return true;
   }
 
   /**

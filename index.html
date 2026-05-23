@@ -34,6 +34,14 @@
         </div>
         
         <div class="setup-group">
+          <label for="map-size">Map Size</label>
+          <select id="map-size" class="setup-select">
+            <option value="standard" selected>Standard Map (15 Properties, Pop: 150)</option>
+            <option value="large">Large Map (32 Properties, Pop: 450)</option>
+          </select>
+        </div>
+        
+        <div class="setup-group">
           <label>Configure Players</label>
           <div id="players-setup-container">
             <!-- Dynamically populated rows for player configuration -->
@@ -290,13 +298,18 @@
       <div class="bank-card glass glass-glow" style="width: 450px; text-align: left;">
         <h3>Entrepreneur's Guide</h3>
         <div style="font-size: 0.85rem; line-height: 1.5; color: var(--text-muted); display: flex; flex-direction: column; gap: 10px; max-height: 350px; overflow-y: auto; padding-right: 5px;">
-          <p><strong style="color: var(--text-main)">Objective:</strong> Achieve the highest Net Worth (Cash + Asset Value - Debt) at the end of the day limit.</p>
+          <div style="background: rgba(0, 242, 254, 0.06); border: 1px solid rgba(0, 242, 254, 0.2); border-radius: 8px; padding: 12px; margin-bottom: 5px; box-shadow: 0 0 10px rgba(0, 242, 254, 0.05);">
+            <h4 style="color: var(--accent-cyan); margin: 0 0 6px 0; font-size: 0.95rem; font-weight: 800; display: flex; align-items: center; gap: 6px;">🎯 Core Objective</h4>
+            <p style="margin: 0; color: var(--text-main); font-weight: 600; font-size: 0.85rem; line-height: 1.4;">
+              Achieve the highest Net Worth (Cash + Asset Value - Debt) at the end of the day limit.
+            </p>
+          </div>
           
           <p><strong style="color: var(--text-main)">1. Game Grid & Map:</strong> The town is a grid. Click on properties (like Grocery, Restaurant, Mechanic, Farm, Bank, AdServices) to inspect details, buy, or adjust settings. Roads are for paths, houses generate customers.</p>
           
           <p><strong style="color: var(--text-main)">2. B2C pricing:</strong> Owners set prices. If prices are high relative to town affluence, customers will avoid you. Upgrades and ad campaigns increase customer willingness to visit.</p>
           
-          <p><strong style="color: var(--text-main)">3. Supply Chain:</strong> Groceries and Restaurants require raw goods. Buy them wholesale from a player-owned Farm. If you have no raw goods, you pay expensive emergency import costs ($18 for Grocery, $28 for Restaurant) for each customer!</p>
+          <p><strong style="color: var(--text-main)">3. Supply Chain:</strong> Groceries and Restaurants require raw goods. Buy them wholesale from a player-owned Farm. If you have no raw goods, you pay expensive emergency import costs (always 5% higher than the highest selling price in town) for each customer!</p>
           
           <p><strong style="color: var(--text-main)">4. Ad Campaigns:</strong> Buy campaigns from AdServices to spike advertising awareness. If player-owned, the transaction fee goes to the AdServices owner.</p>
           
@@ -305,6 +318,97 @@
           <p><strong style="color: var(--text-main)">6. Skills Upgrade:</strong> Spend cash to level up 5 key skills (Technology, Social, Planning, Marketing, Management) to receive powerful operational discounts and bonuses.</p>
         </div>
         <button id="btn-help-close" class="btn-action" style="width: 100%; margin-top: 15px;">Got it</button>
+      </div>
+    </div>
+
+    <!-- --- BUY OFFER OVERLAY --- -->
+    <div class="bank-overlay" id="offer-overlay">
+      <div class="bank-card glass glass-glow" style="width: 360px;">
+        <h3 style="color: var(--accent-cyan);">Make Purchase Offer</h3>
+        <p id="offer-property-desc" style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-bottom: 15px;"></p>
+        
+        <div class="bank-row">
+          <span class="lbl">Property Value:</span>
+          <span class="val" id="offer-prop-val" style="color: var(--accent-cyan)">$0</span>
+        </div>
+        <div class="bank-row">
+          <span class="lbl">Your Cash:</span>
+          <span class="val" id="offer-buyer-cash" style="color: var(--accent-green)">$0</span>
+        </div>
+        
+        <div class="setup-group" style="margin-top: 15px;">
+          <label for="offer-price-input">Offer Amount ($):</label>
+          <input type="number" id="offer-price-input" class="setup-input" style="width: 100%; text-align: center; font-size: 1.1rem; padding: 10px; margin-top: 5px;" min="1">
+          <div id="offer-error-msg" style="color: var(--accent-pink); font-size: 0.75rem; margin-top: 5px; text-align: center; display: none;"></div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px;">
+          <button id="btn-offer-submit" class="btn-action buy">Send Offer</button>
+          <button id="btn-offer-cancel" class="btn-action">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- --- OFFER DECISION OVERLAY --- -->
+    <div class="bank-overlay" id="decision-overlay">
+      <div class="bank-card glass glass-glow" style="width: 360px; text-align: center;">
+        <h3 style="color: var(--accent-gold);">Buy Offer Received!</h3>
+        <p id="decision-desc" style="font-size: 0.85rem; color: var(--text-main); margin-bottom: 20px; line-height: 1.5;"></p>
+        
+        <div class="bank-row" style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; border: 1px solid var(--border-light); margin-bottom: 20px; display: flex; flex-direction: column; gap: 8px; align-items: stretch;">
+          <div style="display: flex; justify-content: space-between;">
+            <span class="lbl">Offer Price:</span>
+            <span class="val" id="decision-offer-price" style="color: var(--accent-green); font-size: 1.1rem;">$0</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span class="lbl">Property Value:</span>
+            <span class="val" id="decision-prop-value" style="color: var(--accent-cyan);">$0</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span class="lbl">Net Profit/Premium:</span>
+            <span class="val" id="decision-profit" style="color: var(--accent-gold); font-weight: 700;">$0</span>
+          </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <button id="btn-decision-accept" class="btn-action buy" style="background: rgba(16, 185, 129, 0.15); border-color: var(--accent-green);">Accept Offer</button>
+          <button id="btn-decision-reject" class="btn-action sell">Reject Offer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- --- NOTIFICATION MODAL OVERLAY --- -->
+    <div class="bank-overlay" id="notification-overlay">
+      <div class="bank-card glass glass-glow" style="width: 360px; text-align: center; display: flex; flex-direction: column; gap: 15px; align-items: center;">
+        <h3 id="notification-title" style="color: var(--accent-pink); margin-bottom: 5px;">Notice</h3>
+        <p id="notification-message" style="font-size: 0.85rem; color: var(--text-main); line-height: 1.5; margin: 0;"></p>
+        <button id="btn-notification-close" class="btn-action" style="width: 100%; margin-top: 10px;">OK</button>
+        <div id="notification-confirm-buttons" style="display: none; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-top: 10px;">
+          <button id="btn-notification-confirm" class="btn-action buy">Yes</button>
+          <button id="btn-notification-cancel" class="btn-action sell">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- --- ONBOARDING FLOW OVERLAY --- -->
+    <div id="onboarding-overlay" class="bank-overlay" style="display: none; pointer-events: all; z-index: 10000; justify-content: flex-start; align-items: center; padding-left: 5%;">
+      <div class="bank-card glass glass-glow onboarding-card animate-fade-in" style="width: 420px; display: flex; flex-direction: column; gap: 15px; margin-top: auto; margin-bottom: auto; position: relative;">
+        <button id="btn-onboarding-skip" style="position: absolute; top: 12px; right: 12px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; font-family: var(--font-main); transition: color 0.2s;">Skip</button>
+        
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.5rem;">🚀</span>
+          <h3 id="onboarding-title" style="margin: 0; color: var(--accent-cyan); font-size: 1.3rem; border: none; padding-bottom: 0; text-align: left; flex: 1;">Welcome to Entrepreneur!</h3>
+        </div>
+        
+        <p id="onboarding-text" style="font-size: 0.85rem; line-height: 1.6; color: var(--text-main); margin: 0;"></p>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+          <span id="onboarding-step-indicator" style="font-size: 0.75rem; color: var(--text-muted);">Step 1 of 4</span>
+          <div style="display: flex; gap: 8px;">
+            <button id="btn-onboarding-prev" class="btn-action" style="padding: 6px 12px; font-size: 0.8rem; display: none;">Back</button>
+            <button id="btn-onboarding-next" class="btn-action buy" style="padding: 6px 16px; font-size: 0.8rem;">Next</button>
+          </div>
+        </div>
       </div>
     </div>
 

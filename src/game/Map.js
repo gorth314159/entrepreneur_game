@@ -20,13 +20,17 @@ export default class Map {
     this.particles = [];
     
     // Grid settings
-    this.cols = 20;
-    this.rows = 15;
-    this.cellW = canvas.width / this.cols;  // 40px
-    this.cellH = canvas.height / this.rows; // 40px
+    const isLarge = properties.length > 15;
+    this.cols = isLarge ? 39 : 20;
+    this.rows = isLarge ? 24 : 15;
+    this.cellW = canvas.width / this.cols;
+    this.cellH = canvas.height / this.rows;
     
     // Road definitions (grid coordinates)
-    this.roads = {
+    this.roads = isLarge ? {
+      rows: [4, 9, 14, 19],
+      cols: [4, 9, 14, 19, 24, 29, 34]
+    } : {
       rows: [3, 7, 11],
       cols: [4, 10, 15]
     };
@@ -38,24 +42,50 @@ export default class Map {
   }
 
   getResidentialZones() {
-    const zones = [
-      { name: 'Valley Estate', gridX: 1, gridY: 12, w: 3, h: 2 },
-      { name: 'Metro Condos', gridX: 12, gridY: 0, w: 3, h: 2 },
-      { name: 'Suburban Villas', gridX: 16, gridY: 8, w: 3, h: 2 }
-    ];
-    if (this.town && this.town.developmentManager && this.town.developmentManager.isProjectActive('aura_heights')) {
-      zones.push({ name: 'Aura Heights', gridX: 16, gridY: 0, w: 3, h: 2, isLuxury: true });
+    if (this.cols === 39) {
+      const zones = [
+        { name: 'Valley Estate', gridX: 0, gridY: 11, w: 3, h: 2 },
+        { name: 'Metro Condos', gridX: 35, gridY: 11, w: 3, h: 2 },
+        { name: 'Suburban Villas', gridX: 10, gridY: 21, w: 3, h: 2 },
+        { name: 'Coastal Heights', gridX: 25, gridY: 21, w: 3, h: 2 },
+        { name: 'Central Plaza', gridX: 15, gridY: 11, w: 3, h: 2 },
+        { name: 'Lakeside Point', gridX: 10, gridY: 1, w: 3, h: 2 },
+        { name: 'Pine Crest', gridX: 25, gridY: 1, w: 3, h: 2 }
+      ];
+      if (this.town && this.town.developmentManager && this.town.developmentManager.isProjectActive('aura_heights')) {
+        zones.push({ name: 'Aura Heights', gridX: 20, gridY: 1, w: 3, h: 2, isLuxury: true });
+      }
+      return zones;
+    } else {
+      const zones = [
+        { name: 'Valley Estate', gridX: 1, gridY: 12, w: 3, h: 2 },
+        { name: 'Metro Condos', gridX: 12, gridY: 0, w: 3, h: 2 },
+        { name: 'Suburban Villas', gridX: 16, gridY: 8, w: 3, h: 2 }
+      ];
+      if (this.town && this.town.developmentManager && this.town.developmentManager.isProjectActive('aura_heights')) {
+        zones.push({ name: 'Aura Heights', gridX: 16, gridY: 0, w: 3, h: 2, isLuxury: true });
+      }
+      return zones;
     }
-    return zones;
   }
 
   setupListeners() {
-    this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
-    this.canvas.addEventListener('click', (e) => this.handleMouseClick(e));
-    this.canvas.addEventListener('mouseleave', () => {
+    this._boundMouseMove = (e) => this.handleMouseMove(e);
+    this._boundMouseClick = (e) => this.handleMouseClick(e);
+    this._boundMouseLeave = () => {
       this.hoveredProperty = null;
       this.canvas.style.cursor = 'default';
-    });
+    };
+
+    this.canvas.addEventListener('mousemove', this._boundMouseMove);
+    this.canvas.addEventListener('click', this._boundMouseClick);
+    this.canvas.addEventListener('mouseleave', this._boundMouseLeave);
+  }
+
+  destroy() {
+    this.canvas.removeEventListener('mousemove', this._boundMouseMove);
+    this.canvas.removeEventListener('click', this._boundMouseClick);
+    this.canvas.removeEventListener('mouseleave', this._boundMouseLeave);
   }
 
   /**
@@ -238,9 +268,9 @@ export default class Map {
       this.ctx.fillStyle = zone.isLuxury ? 'rgba(255, 215, 0, 0.35)' : 'rgba(255, 255, 255, 0.15)';
       for (let i = 0; i < zone.w; i++) {
         for (let j = 0; j < zone.h; j++) {
-          const houseX = zX + i * this.cellW + 10;
-          const houseY = zY + j * this.cellH + 10;
-          const hSize = 20;
+          const houseX = zX + i * this.cellW + this.cellW * 0.25;
+          const houseY = zY + j * this.cellH + this.cellH * 0.25;
+          const hSize = Math.min(this.cellW, this.cellH) * 0.5;
 
           this.ctx.beginPath();
           this.ctx.moveTo(houseX + hSize/2, houseY);
@@ -262,10 +292,11 @@ export default class Map {
 
     // 4. Draw Properties
     this.properties.forEach(prop => {
-      const px = prop.gridX * this.cellW + 6;
-      const py = prop.gridY * this.cellH + 6;
-      const pw = prop.width * this.cellW - 12;
-      const ph = prop.height * this.cellH - 12;
+      const offset = Math.min(this.cellW, this.cellH) * 0.15;
+      const px = prop.gridX * this.cellW + offset;
+      const py = prop.gridY * this.cellH + offset;
+      const pw = prop.width * this.cellW - offset * 2;
+      const ph = prop.height * this.cellH - offset * 2;
 
       const isSelected = this.selectedProperty === prop;
       const isHovered = this.hoveredProperty === prop;
@@ -337,8 +368,10 @@ export default class Map {
       if (prop.owner && prop.upgradeLevel > 1) {
         this.ctx.fillStyle = '#ffd700';
         this.ctx.font = '10px sans-serif';
+        this.ctx.textAlign = 'right';
         const stars = '★'.repeat(prop.upgradeLevel - 1);
-        this.ctx.fillText(stars, px + pw/2, py + ph/2 + 8);
+        this.ctx.fillText(stars, px + pw - 6, py + 14);
+        this.ctx.textAlign = 'center';
       }
     });
 

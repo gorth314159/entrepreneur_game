@@ -4,8 +4,9 @@ import { TownDevelopmentManager } from './TownDevelopment.js';
  * Manages the autonomous town population, customer logic, economic health, and simulation phase.
  */
 export default class Town {
-  constructor() {
-    this.population = 150; // Starting population (customers)
+  constructor(startingPopulation = 150) {
+    this.startingPopulation = startingPopulation;
+    this.population = startingPopulation; // Starting population (customers)
     this.affluence = 'Medium'; // 'Low', 'Medium', 'High'
     this.day = 1;
     this.maxDays = 30;
@@ -74,19 +75,21 @@ export default class Town {
       }
     });
 
-    // 1. Calculate general town economic health based on player activity
+    // 1. Calculate general town economic health based on the lowest price in each industry
     // Economic health is higher if business prices are reasonable, ad campaigns are active, and cash flows.
-    let activeBusinesses = properties.filter(p => p.owner !== null && ['GroceryStore', 'Restaurant', 'RetailStore', 'MechanicShop'].includes(p.type));
-    let avgPriceRatio = 1.0; // relative to target prices
-    
-    if (activeBusinesses.length > 0) {
-      let ratioSum = 0;
-      activeBusinesses.forEach(b => {
-        const target = this.targetPrices[b.type] || 30;
-        ratioSum += b.price / target;
-      });
-      avgPriceRatio = ratioSum / activeBusinesses.length;
-    }
+    const b2cTypes = ['GroceryStore', 'Restaurant', 'RetailStore', 'MechanicShop'];
+    let ratioSum = 0;
+    b2cTypes.forEach(type => {
+      const locations = properties.filter(p => p.type === type);
+      const target = this.targetPrices[type] || 30;
+      if (locations.length > 0) {
+        const minPrice = Math.min(...locations.map(l => l.price));
+        ratioSum += minPrice / target;
+      } else {
+        ratioSum += 1.0;
+      }
+    });
+    let avgPriceRatio = ratioSum / b2cTypes.length;
 
     // High prices harm economic health. Ads and upgrades boost it.
     let adBoost = properties.reduce((sum, p) => sum + (p.adAwareness || 0), 0) / properties.length;
@@ -108,10 +111,27 @@ export default class Town {
     }
     
     const heightsMultiplier = isHeightsActive ? 1.3 : 1.0;
-    const baseMigrationRate = 0.12; // increased from 0.08 to make population growth faster
-    const populationChange = Math.round(this.population * (econHealth - 1.0) * baseMigrationRate * transitMultiplier * heightsMultiplier);
-    const minPop = isTransitActive ? 100 : 50;
-    this.population = Math.max(minPop, Math.min(500, this.population + populationChange));
+    const baseMigrationRate = 0.12;
+    
+    let populationChange = 0;
+    if (econHealth > 1.0) {
+      // Drastically increase population growth for a healthy economy.
+      // Target adding 5-10 people per day under typical healthy conditions (econHealth 1.05 to 1.15).
+      const baseGrowthRate = 0.35;
+      const flatGrowth = 4.5;
+      // Scale flat boost when econHealth is close to 1.0 to ensure a smooth transition
+      const scaleFactor = Math.min(1.0, (econHealth - 1.0) / 0.05); // reaches 1.0 at econHealth = 1.05
+      const growthAmt = this.population * (econHealth - 1.0) * baseGrowthRate + flatGrowth * scaleFactor;
+      populationChange = Math.round(growthAmt * transitMultiplier * heightsMultiplier);
+    } else if (econHealth < 1.0) {
+      // Population decline remains natural
+      populationChange = Math.round(this.population * (econHealth - 1.0) * baseMigrationRate * transitMultiplier * heightsMultiplier);
+    }
+    
+    const scaleFactor = this.startingPopulation / 150;
+    const minPop = (isTransitActive ? 100 : 50) * scaleFactor;
+    const maxPop = 500 * scaleFactor;
+    this.population = Math.max(minPop, Math.min(maxPop, this.population + populationChange));
     
     if (populationChange > 0) {
       dailyLog.events.push(`${populationChange} new residents moved to town due to favorable economic conditions.`);
@@ -122,7 +142,7 @@ export default class Town {
     // 3. Shift Affluence
     // Affluence is based on average price index and population level
     const affluenceBonus = this.developmentManager.isProjectActive('aura_heights') ? 0.3 : 0;
-    const currentScore = econHealth * (this.population / 150) + affluenceBonus;
+    const currentScore = econHealth * (this.population / this.startingPopulation) + affluenceBonus;
     const prevAffluence = this.affluence;
     if (currentScore > 1.4) {
       this.affluence = 'High';
@@ -143,16 +163,12 @@ export default class Town {
     const totalVisits = Math.floor(this.population * transactionsPerResident);
 
     // Group B2C properties by type for comparison
-    const b2cTypes = ['GroceryStore', 'Restaurant', 'RetailStore', 'MechanicShop'];
     const propertiesByType = {};
     b2cTypes.forEach(type => {
       propertiesByType[type] = properties.filter(p => p.type === type);
     });
 
-    const bankOwner = (() => {
-      const b = properties.find(p => p.type === 'Bank');
-      return b && b.owner ? b.owner : null;
-    })();
+    // We will check active player-owned banks dynamically for transaction fee splitting below
 
     for (let visit = 0; visit < totalVisits; visit++) {
       // Determine what type of need the customer has
@@ -217,12 +233,18 @@ export default class Town {
             this.recordPlayerRevenue(selectedProp.owner.id, revenueEarned, 1);
           }
 
-          if (bankOwner && bankOwner !== selectedProp.owner) {
-            const fee = Math.round(revenueEarned * 0.04);
-            if (fee > 0) {
-              bankOwner.cash += fee;
-              bankOwner.logTransaction('Bank Transaction Fee', fee, `Processing fee from ${selectedProp.name}`);
-              this.recordPlayerRevenue(bankOwner.id, fee, 0);
+          const eligibleBanks = properties.filter(p => p.type === 'Bank' && p.owner && p.owner !== selectedProp.owner);
+          if (eligibleBanks.length > 0) {
+            const totalFee = Math.round(revenueEarned * 0.04);
+            if (totalFee > 0) {
+              const feePerBank = Math.round(totalFee / eligibleBanks.length);
+              if (feePerBank > 0) {
+                eligibleBanks.forEach(bank => {
+                  bank.owner.cash += feePerBank;
+                  bank.owner.logTransaction('Bank Transaction Fee', feePerBank, `Processing fee from ${selectedProp.name} (Split)`);
+                  this.recordPlayerRevenue(bank.owner.id, feePerBank, 0);
+                });
+              }
             }
           }
         }
@@ -235,22 +257,30 @@ export default class Town {
     });
 
     // 6. Accrue interest on player loans from the Bank
-    // Let's see if there is an active Bank owned by a player
-    const playerBank = properties.find(p => p.type === 'Bank' && p.owner !== null);
+    // Let's see all active Banks owned by players
+    const ownedBanks = properties.filter(p => p.type === 'Bank' && p.owner !== null);
     
     players.forEach(player => {
       if (player.debt > 0) {
-        // Accrue daily interest. (bank interest rate / 30 represents daily interest)
-        const bankInterestRate = playerBank ? playerBank.interestRate : 0.18; // 18% default unowned rate
+        // Accrue daily interest based on the average interest rate of all active player-owned banks, or default 18%
+        const bankInterestRate = ownedBanks.length > 0 
+          ? (ownedBanks.reduce((sum, b) => sum + b.interestRate, 0) / ownedBanks.length) 
+          : 0.18;
         const dailyInterestRate = bankInterestRate / 30;
         
         const interestPaid = player.accrueInterest(dailyInterestRate);
         
-        // If a player owns the bank, the interest goes to their pocket!
-        if (interestPaid > 0 && playerBank && playerBank.owner && playerBank.owner !== player) {
-          playerBank.owner.cash += interestPaid;
-          playerBank.owner.logTransaction('Bank Loan Revenue', interestPaid, `Received loan interest from ${player.name}`);
-          this.recordPlayerRevenue(playerBank.owner.id, interestPaid, 0);
+        // Distribute the interest paid equally among all player-owned banks (excluding the borrower)
+        const recipientBanks = ownedBanks.filter(b => b.owner !== player);
+        if (interestPaid > 0 && recipientBanks.length > 0) {
+          const interestPerBank = Math.round(interestPaid / recipientBanks.length);
+          if (interestPerBank > 0) {
+            recipientBanks.forEach(bank => {
+              bank.owner.cash += interestPerBank;
+              bank.owner.logTransaction('Bank Loan Revenue', interestPerBank, `Received loan interest from ${player.name} (Split)`);
+              this.recordPlayerRevenue(bank.owner.id, interestPerBank, 0);
+            });
+          }
         }
       }
     });
@@ -303,7 +333,7 @@ export default class Town {
     } else if (this.affluence === 'Medium') {
       // Normal price sensitivity
       if (prop.price > targetPrice) {
-        priceScore = Math.max(0.1, 1.0 - ((prop.price - targetPrice) / targetPrice) * 0.8);
+        priceScore = Math.max(0.01, 1.0 - ((prop.price - targetPrice) / targetPrice) * 0.8);
       } else {
         priceScore = 1.0 + ((targetPrice - prop.price) / targetPrice) * 0.2;
       }
@@ -311,7 +341,7 @@ export default class Town {
       // High Affluence: Not price sensitive, prefers upgraded locations
       // Premium pricing is tolerated up to 50% above target
       if (prop.price > targetPrice * 1.5) {
-        priceScore = Math.max(0.2, 1.0 - ((prop.price - targetPrice * 1.5) / targetPrice));
+        priceScore = Math.max(0.01, 1.0 - ((prop.price - targetPrice * 1.5) / targetPrice));
       } else {
         priceScore = 1.0;
       }
@@ -319,8 +349,18 @@ export default class Town {
       priceScore *= (1.0 + (prop.upgradeLevel - 1) * 0.15);
     }
 
+    // 4. Price Hike Penalty compared to the rest of the industry
+    let priceHikePenalty = 1.0;
+    const industryLocations = (this.currentProperties || []).filter(p => p.type === prop.type);
+    if (industryLocations.length > 0) {
+      const minPrice = Math.min(...industryLocations.map(l => l.price));
+      if (prop.price > minPrice) {
+        priceHikePenalty = Math.pow(minPrice / prop.price, 3.0);
+      }
+    }
+
     // Multiply scores together
-    return adMultiplier * satisfactionMultiplier * priceScore;
+    return adMultiplier * satisfactionMultiplier * priceScore * priceHikePenalty;
   }
 
   /**
